@@ -1,0 +1,194 @@
+<svg
+  width="1200"
+  height="800"
+  viewBox="0 0 1200 800"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <linearGradient
+      id="bg"
+      x1="0"
+      y1="0"
+      x2="1200"
+      y2="800"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#0F172A" />
+      <stop offset="1" stop-color="#1E293B" />
+    </linearGradient>
+
+    <linearGradient id="boardGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F8FAFC" stop-opacity="0.2" />
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0.05" />
+    </linearGradient>
+
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow
+        dx="0"
+        dy="12"
+        stdDeviation="18"
+        flood-color="#000000"
+        flood-opacity="0.35"
+      />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)" />
+
+  <!-- Decorative circles -->
+  <circle cx="180" cy="160" r="120" fill="#38BDF8" opacity="0.08" />
+  <circle cx="1020" cy="640" r="180" fill="#22C55E" opacity="0.08" />
+
+  <!-- Chess board -->
+  <g filter="url(#shadow)">
+    <rect x="320" y="150" width="560" height="560" rx="28" fill="#0B1220" />
+    <rect
+      x="340"
+      y="170"
+      width="520"
+      height="520"
+      rx="18"
+      fill="url(#boardGlow)"
+      stroke="#475569"
+      stroke-width="2"
+    />
+
+    <!-- Squares -->
+    <g>
+      <rect x="340" y="170" width="65" height="65" fill="#CBD5E1" />
+      <rect x="405" y="170" width="65" height="65" fill="#334155" />
+      <rect x="470" y="170" width="65" height="65" fill="#CBD5E1" />
+      <rect x="535" y="170" width="65" height="65" fill="#334155" />
+      <rect x="600" y="170" width="65" height="65" fill="#CBD5E1" />
+      <rect x="665" y="170" width="65" height="65" fill="#334155" />
+      <rect x="730" y="170" width="65" height="65" fill="#CBD5E1" />
+      <rect x="795" y="170" width="65" height="65" fill="#334155" />
+
+      <rect x="340" y="235" width="65" height="65" fill="#334155" />
+      <rect x="405" y="235" width="65" height="65" fill="#CBD5E1" />
+      <rect x="470" y="235" width="65" height="65" fill="#334155" />
+      <rect x="535" y="235" width="65" height="65" fill="#CBD5E1" />
+      <rect x="600" y="235" width="65" height="65" fill="#334155" />
+      <rect x="665" y="235" width="65" height="65" fill="#CBD5E1" />
+      <rect x="730" y="235" width="65" height="65" fill="#334155" />
+      <rect x="795" y="235" width="65" height="65" fill="#CBD5E1" />
+
+      <rect x="340" y="300" width="65" height="65" fill="#CBD5E1" />
+      <rect x="405" y="300" width="65" height="65" fill="#334155" />
+      <rect x="470" y="300" width="65" height="65" fill="#CBD5E1" />
+      <rect x="535" y="300" width="65" height="65" fill="#334155" />
+      <rect x="600" y="300" width="65" height="65" fill="#CBD5E1" />
+      <rect x="665" y="300" width="65" height="65" fill="#334155" />
+      <rect x="730" y="300" width="65" height="65" fill="#CBD5E1" />
+      <rect x="795" y="300" width="65" height="65" fill="#334155" />
+
+      <rect x="340" y="365" width="65" height="65" fill="#334155" />
+      <rect x="405" y="365" width="65" height="65" fill="#CBD5E1" />
+      <rect x="470" y="365" width="65" height="65" fill="#334155" />
+      <rect x="535" y="365" width="65" height="65" fill="#CBD5E1" />
+      <rect x="600" y="365" width="65" height="65" fill="#334155" />
+      <rect x="665" y="365" width="65" height="65" fill="#CBD5E1" />
+      <rect x="730" y="365" width="65" height="65" fill="#334155" />
+      <rect x="795" y="365" width="65" height="65" fill="#CBD5E1" />
+
+      <rect x="340" y="430" width="65" height="65" fill="#CBD5E1" />
+      <rect x="405" y="430" width="65" height="65" fill="#334155" />
+      <rect x="470" y="430" width="65" height="65" fill="#CBD5E1" />
+      <rect x="535" y="430" width="65" height="65" fill="#334155" />
+      <rect x="600" y="430" width="65" height="65" fill="#CBD5E1" />
+      <rect x="665" y="430" width="65" height="65" fill="#334155" />
+      <rect x="730" y="430" width="65" height="65" fill="#CBD5E1" />
+      <rect x="795" y="430" width="65" height="65" fill="#334155" />
+
+      <rect x="340" y="495" width="65" height="65" fill="#334155" />
+      <rect x="405" y="495" width="65" height="65" fill="#CBD5E1" />
+      <rect x="470" y="495" width="65" height="65" fill="#334155" />
+      <rect x="535" y="495" width="65" height="65" fill="#CBD5E1" />
+      <rect x="600" y="495" width="65" height="65" fill="#334155" />
+      <rect x="665" y="495" width="65" height="65" fill="#CBD5E1" />
+      <rect x="730" y="495" width="65" height="65" fill="#334155" />
+      <rect x="795" y="495" width="65" height="65" fill="#CBD5E1" />
+
+      <rect x="340" y="560" width="65" height="65" fill="#CBD5E1" />
+      <rect x="405" y="560" width="65" height="65" fill="#334155" />
+      <rect x="470" y="560" width="65" height="65" fill="#CBD5E1" />
+      <rect x="535" y="560" width="65" height="65" fill="#334155" />
+      <rect x="600" y="560" width="65" height="65" fill="#CBD5E1" />
+      <rect x="665" y="560" width="65" height="65" fill="#334155" />
+      <rect x="730" y="560" width="65" height="65" fill="#CBD5E1" />
+      <rect x="795" y="560" width="65" height="65" fill="#334155" />
+
+      <rect x="340" y="625" width="65" height="65" fill="#334155" />
+      <rect x="405" y="625" width="65" height="65" fill="#CBD5E1" />
+      <rect x="470" y="625" width="65" height="65" fill="#334155" />
+      <rect x="535" y="625" width="65" height="65" fill="#CBD5E1" />
+      <rect x="600" y="625" width="65" height="65" fill="#334155" />
+      <rect x="665" y="625" width="65" height="65" fill="#CBD5E1" />
+      <rect x="730" y="625" width="65" height="65" fill="#334155" />
+      <rect x="795" y="625" width="65" height="65" fill="#CBD5E1" />
+    </g>
+  </g>
+
+  <!-- Parent king piece -->
+  <g transform="translate(510 250)">
+    <path
+      d="M90 40H110V70H140V90H110V120C110 150 130 170 130 210H70C70 170 90 150 90 120V90H60V70H90V40Z"
+      fill="#F8FAFC"
+    />
+    <rect x="55" y="210" width="90" height="18" rx="6" fill="#E2E8F0" />
+    <circle cx="100" cy="20" r="16" fill="#38BDF8" />
+  </g>
+
+  <!-- Child pawn piece -->
+  <g transform="translate(640 370)">
+    <circle cx="45" cy="35" r="24" fill="#22C55E" />
+    <path
+      d="M25 70H65C65 95 80 110 80 145H10C10 110 25 95 25 70Z"
+      fill="#DCFCE7"
+    />
+    <rect x="0" y="145" width="90" height="16" rx="6" fill="#BBF7D0" />
+  </g>
+
+  <!-- Protection arc -->
+  <path
+    d="M560 300C640 220 760 240 820 360"
+    stroke="#38BDF8"
+    stroke-width="8"
+    stroke-linecap="round"
+    opacity="0.7"
+  />
+
+  <!-- Heart icon -->
+  <path
+    d="M970 160C970 130 1010 120 1025 145C1040 120 1080 130 1080 160C1080 205 1025 240 1025 240C1025 240 970 205 970 160Z"
+    fill="#F43F5E"
+    opacity="0.9"
+  />
+
+  <!-- Title -->
+  <text
+    x="600"
+    y="95"
+    text-anchor="middle"
+    fill="#F8FAFC"
+    font-family="Verdana, sans-serif"
+    font-size="54"
+    font-weight="700"
+  >
+    ChessCare
+  </text>
+
+  <!-- Subtitle -->
+  <text
+    x="600"
+    y="135"
+    text-anchor="middle"
+    fill="#CBD5E1"
+    font-family="Verdana, sans-serif"
+    font-size="22"
+  >
+    Personalizirani pristup šahu • Učenje  • Razvoj
+  </text>
+</svg>
