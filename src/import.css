@@ -1,0 +1,88 @@
+.chess-container {
+  background: #222;
+  color: #0f0;
+
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.chess-board {
+  background: #111;
+  color: #0f0;
+  padding: 20px;
+  border-radius: 10px;
+  overflow-x: auto;
+  width: fit-content;
+  font-size: 1.2em;
+}
+.chess-board-content {
+  display: flex;
+  gap: 10px;
+}
+
+.chess-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.chess-controls-navigation {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.chess-controls-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.chess-input {
+  padding: 10px;
+  font-size: 16px;
+  height: 40px;
+  width: 200px;
+}
+
+.chess-button {
+  padding: 10px 20px;
+  cursor: pointer;
+  height: 40px;
+  background: #0f0;
+}
+
+.chess-reset-button {
+  padding: 10px 20px;
+  background: #d33;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  height: 40px;
+}
+
+.chess-nav-button {
+  padding: 10px 15px;
+  font-size: 18px;
+  cursor: pointer;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.chess-nav-status {
+  align-self: center;
+  font-weight: bold;
+}
+
+.chess-info {
+  margin-top: 20px;
+}
+
+.chess-textarea {
+  width: 100%;
+  padding: 10px;
+  font-family: monospace;
+}
