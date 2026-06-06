@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Chess } from "chess.js";
 import PgnSaver from "./PgnSaver";
 import PgnLoader from "./PgnLoader";
@@ -14,17 +14,20 @@ export default function ChessGame() {
   const [blackPlayer, setBlackPlayer] = useState("");
   const [eventName, setEventName] = useState("");
 
-  // NOVI STATE: Prati koji potez trenutno gledamo (-1 znači početna pozicija)
+  // Prati koji potez trenutno gledamo (-1 znači početna pozicija)
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
 
-  // Pomoćna funkcija koja nam daje listu svih odigranih poteza do sada
+  // Dohvaćamo povijest glavne partije
   const history = chess.history();
 
-  // Kreiramo privremenu ploču koja prikazuje poziciju na kojoj se korisnik trenutno nalazi u povijesti
-  const displayChess = new Chess();
-  for (let i = 0; i <= currentMoveIndex; i++) {
-    displayChess.move(history[i]);
-  }
+  // OPTIMIZACIJA: displayChess se rekreira samo kada se promijeni partija ili indeks poteza
+  const displayChess = useMemo(() => {
+    const tempChess = new Chess();
+    for (let i = 0; i <= currentMoveIndex; i++) {
+      tempChess.move(history[i]);
+    }
+    return tempChess;
+  }, [chess, currentMoveIndex, history]);
 
   const handleGameLoaded = (loadedGame) => {
     setChess(loadedGame);
@@ -35,7 +38,6 @@ export default function ChessGame() {
     setBlackPlayer(headers["Black"] || "");
     setEventName(headers["Event"] || "");
 
-    // Kada se učita nova partija, skoči na njezin kraj
     setCurrentMoveIndex(loadedGame.history().length - 1);
     setMessage("📂 Partija uspješno učitana iz datoteke!");
   };
@@ -43,10 +45,9 @@ export default function ChessGame() {
   function handleMove() {
     if (!moveInput.trim()) return;
 
-    // Ako korisnik odigra potez dok gleda neku staru poziciju,
-    // kreiramo novu partiju od te pozicije (odsijecamo buduće poteze)
+    // Ako igramo novi potez dok smo u prošlosti, režemo sve nakon toga
     const updatedChess = new Chess();
-    const historyUpToCurrent = chess.history().slice(0, currentMoveIndex + 1);
+    const historyUpToCurrent = history.slice(0, currentMoveIndex + 1);
 
     for (const m of historyUpToCurrent) {
       updatedChess.move(m);
@@ -66,10 +67,7 @@ export default function ChessGame() {
 
       setChess(updatedChess);
       setPgn(updatedChess.pgn());
-
-      // Budući da smo odigrali novi potez, indeks se pomiče na taj novi kraj
       setCurrentMoveIndex(updatedChess.history().length - 1);
-
       setMessage(`✅ Odigrano: ${move.san}`);
       setMoveInput("");
     } catch {
@@ -80,11 +78,11 @@ export default function ChessGame() {
   function resetGame() {
     setChess(new Chess());
     setPgn("");
-    setCurrentMoveIndex(-1); // Resetiramo indeks na početak
+    setCurrentMoveIndex(-1);
     setMessage("♻️ Partija resetirana");
   }
 
-  // FUNKCIJE ZA NAVIGACIJU KROZ POTEZE
+  // Funkcije za navigaciju
   const jumpToStart = () => setCurrentMoveIndex(-1);
   const stepBackward = () =>
     setCurrentMoveIndex((prev) => Math.max(-1, prev - 1));
@@ -96,12 +94,11 @@ export default function ChessGame() {
     <div className="chess-container">
       <h1>♟️ Chess.js React Demo</h1>
 
-      {/* VAŽNO: Sada renderiramo 'displayChess.ascii()' umjesto 'chess.ascii()' */}
       <div className="chess-board">
         <pre>{displayChess.ascii()}</pre>
       </div>
 
-      {/* NOVI DIZJN: Gumbi za listanje kroz poteze (ispod ploče) */}
+      {/* Kontrole za navigaciju */}
       <div className="navigation-controls">
         <button
           onClick={jumpToStart}
@@ -163,35 +160,68 @@ export default function ChessGame() {
           placeholder="Unesi potez (npr. e4 ili Nf3)"
           value={moveInput}
           onChange={(e) => setMoveInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleMove();
-            }
-          }}
+          onKeyDown={(e) => e.key === "Enter" && handleMove()}
           className="chess-input"
         />
 
         <button onClick={handleMove} className="chess-button">
           Odigraj
         </button>
-
         <button onClick={resetGame} className="chess-reset-button">
           Reset
         </button>
       </div>
+
+      {/* POBOLJŠANA LISTA POTEZA: Pojedinačni potezi se mogu kliknuti i označeni su ako su aktivni */}
       <div>
         <h2>Potezi</h2>
+        <div
+          className="moves-list"
+          style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}
+        >
+          {history.reduce((rows, move, index, moves) => {
+            if (index % 2 === 0) {
+              const whiteIdx = index;
+              const blackIdx = index + 1;
+              const hasBlackMove = moves[blackIdx] !== undefined;
 
-        {chess.history().reduce((rows, move, index, moves) => {
-          if (index % 2 === 0) {
-            rows.push(
-              <span key={index}>
-                _{Math.floor(index / 2) + 1}. {move} {moves[index + 1] || ""}
-              </span>,
-            );
-          }
-          return rows;
-        }, [])}
+              rows.push(
+                <span key={index} style={{ padding: "2px 5px" }}>
+                  <strong>{Math.floor(index / 2) + 1}.</strong>{" "}
+                  <span
+                    onClick={() => setCurrentMoveIndex(whiteIdx)}
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor:
+                        currentMoveIndex === whiteIdx
+                          ? "#ffd700"
+                          : "transparent",
+                      padding: "0 2px",
+                    }}
+                  >
+                    {move}
+                  </span>{" "}
+                  {hasBlackMove && (
+                    <span
+                      onClick={() => setCurrentMoveIndex(blackIdx)}
+                      style={{
+                        cursor: "pointer",
+                        backgroundColor:
+                          currentMoveIndex === blackIdx
+                            ? "#ffd700"
+                            : "transparent",
+                        padding: "0 2px",
+                      }}
+                    >
+                      {moves[blackIdx]}
+                    </span>
+                  )}
+                </span>,
+              );
+            }
+            return rows;
+          }, [])}
+        </div>
       </div>
 
       {message && <p>{message}</p>}
