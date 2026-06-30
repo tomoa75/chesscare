@@ -1,9 +1,24 @@
 import { useState, useMemo } from "react";
 import { Chess } from "chess.js";
+import { Chessboard } from "react-chessboard";
 import PgnSaver from "./PgnSaver";
 import PgnLoader from "./PgnLoader";
 import Potez from "../assets/Potez";
+
 import "../import.css"; // Uvezi CSS datoteku za dodatne stilove
+
+function createGameRecord(game, index) {
+  const headers = game.header();
+  const event = headers.Event || "Partija";
+  const white = headers.White || "Bijeli";
+  const black = headers.Black || "Crni";
+
+  return {
+    id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+    title: `${event}: ${white} - ${black}`,
+    pgn: game.pgn(),
+  };
+}
 
 export default function ChessGame() {
   const [chess, setChess] = useState(new Chess());
@@ -13,12 +28,19 @@ export default function ChessGame() {
   const [whitePlayer, setWhitePlayer] = useState("");
   const [blackPlayer, setBlackPlayer] = useState("");
   const [eventName, setEventName] = useState("");
+  const [boardOrientation, setBoardOrientation] = useState("white");
+  const [savedGames, setSavedGames] = useState([]);
+  const [selectedSavedGameId, setSelectedSavedGameId] = useState("");
 
   // Prati koji potez trenutno gledamo (-1 znači početna pozicija)
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
 
   // Dohvaćamo povijest glavne partije
   const history = chess.history();
+  const gamesPgn = useMemo(
+    () => savedGames.map((game) => game.pgn).join("\n\n"),
+    [savedGames],
+  );
 
   // OPTIMIZACIJA: displayChess se rekreira samo kada se promijeni partija ili indeks poteza
   const displayChess = useMemo(() => {
@@ -27,7 +49,26 @@ export default function ChessGame() {
       tempChess.move(history[i]);
     }
     return tempChess;
-  }, [chess, currentMoveIndex, history]);
+  }, [currentMoveIndex, history]);
+
+  const getCurrentGameWithHeaders = () => {
+    const updatedChess = new Chess();
+
+    for (const move of history) {
+      updatedChess.move(move);
+    }
+
+    updatedChess.header(
+      "White",
+      whitePlayer || "Bijeli",
+      "Black",
+      blackPlayer || "Crni",
+      "Event",
+      eventName || "Turnir",
+    );
+
+    return updatedChess;
+  };
 
   const handleGameLoaded = (loadedGame) => {
     setChess(loadedGame);
@@ -41,6 +82,91 @@ export default function ChessGame() {
     setCurrentMoveIndex(loadedGame.history().length - 1);
     setMessage("📂 Partija uspješno učitana iz datoteke!");
   };
+  const handleGamesLoaded = (loadedGames) => {
+    const records = loadedGames.map((game, index) =>
+      createGameRecord(game, index),
+    );
+
+    setSavedGames(records);
+    setSelectedSavedGameId(records[0]?.id || "");
+    handleGameLoaded(loadedGames[0]);
+    setMessage(`Ucitano partija iz datoteke: ${records.length}`);
+  };
+
+  const addCurrentGameToCollection = () => {
+    const currentGame = getCurrentGameWithHeaders();
+
+    if (currentGame.history().length === 0) {
+      setMessage("Nema poteza za dodati u datoteku.");
+      return;
+    }
+
+    const record = createGameRecord(currentGame, savedGames.length);
+    setSavedGames((games) => [...games, record]);
+    setSelectedSavedGameId(record.id);
+    setPgn(currentGame.pgn());
+    setMessage(`Partija dodana u zajednicku datoteku (${savedGames.length + 1}).`);
+  };
+
+  const loadSavedGame = (gameId) => {
+    const record = savedGames.find((game) => game.id === gameId);
+    if (!record) return;
+
+    const loadedGame = new Chess();
+    loadedGame.loadPgn(record.pgn);
+    setSelectedSavedGameId(gameId);
+    handleGameLoaded(loadedGame);
+    setMessage(`Otvorena partija: ${record.title}`);
+  };
+
+  const removeSavedGame = (gameId) => {
+    setSavedGames((games) => games.filter((game) => game.id !== gameId));
+    if (selectedSavedGameId === gameId) {
+      setSelectedSavedGameId("");
+    }
+  };
+
+  function onDrop(sourceSquare, targetSquare) {
+    // radimo novu privremenu instancu iz trenutne pozicije (bitno zbog history sustava)
+    const tempChess = new Chess(displayChess.fen());
+
+    const move = tempChess.move({
+      from: sourceSquare,
+      to: targetSquare,
+      promotion: "q",
+    });
+
+    if (!move) return false;
+
+    // Kreiramo novu “glavnu” igru iz trenutne povijesti + novi potez
+    const updatedChess = new Chess();
+
+    // prvo reproduciramo poteze do trenutnog indeksa
+    const historyUpToCurrent = chess.history().slice(0, currentMoveIndex + 1);
+
+    for (const m of historyUpToCurrent) {
+      updatedChess.move(m);
+    }
+
+    // dodajemo novi potez
+    updatedChess.move(move.san);
+
+    updatedChess.header(
+      "White",
+      whitePlayer || "Bijeli",
+      "Black",
+      blackPlayer || "Crni",
+      "Event",
+      eventName || "Turnir",
+    );
+
+    setChess(updatedChess);
+    setPgn(updatedChess.pgn());
+    setCurrentMoveIndex(updatedChess.history().length - 1);
+    setMessage(`Odigrano: ${move.san}`);
+
+    return true;
+  }
 
   function handleMove() {
     if (!moveInput.trim()) return;
@@ -92,10 +218,14 @@ export default function ChessGame() {
 
   return (
     <div className="chess-container">
-      <h1>♟️ Chess.js React Demo</h1>
+      <h1>Chess.js React Demo</h1>
 
       <div className="chess-board">
-        <pre>{displayChess.ascii()}</pre>
+        <Chessboard
+          position={displayChess.fen()}
+          onPieceDrop={onDrop}
+          boardOrientation={boardOrientation}
+        />
       </div>
 
       {/* Kontrole za navigaciju */}
@@ -130,6 +260,16 @@ export default function ChessGame() {
           className="nav-button"
         >
           ⏭
+        </button>
+        <button
+          onClick={() =>
+            setBoardOrientation((prev) =>
+              prev === "white" ? "black" : "white",
+            )
+          }
+          className="nav-button"
+        >
+          🔄OKRENI PLOČU
         </button>
       </div>
 
@@ -255,12 +395,69 @@ export default function ChessGame() {
         </ul>
       </div>
 
+      <div className="chess-info">
+        <h2>Partije u datoteci</h2>
+        <p>Broj partija: {savedGames.length}</p>
+
+        {savedGames.length > 0 && (
+          <>
+            <select
+              value={selectedSavedGameId}
+              onChange={(event) => loadSavedGame(event.target.value)}
+              className="chess-input"
+              style={{ width: "100%", maxWidth: "500px" }}
+            >
+              {savedGames.map((game, index) => (
+                <option key={game.id} value={game.id}>
+                  {index + 1}. {game.title}
+                </option>
+              ))}
+            </select>
+
+            <ul className="saved-games-list">
+              {savedGames.map((game, index) => (
+                <li key={game.id}>
+                  <button
+                    type="button"
+                    onClick={() => loadSavedGame(game.id)}
+                    className="saved-game-button"
+                  >
+                    {index + 1}. {game.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSavedGame(game.id)}
+                    className="saved-game-remove"
+                  >
+                    Ukloni
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
       <div className="chess-controls" style={{ marginTop: "20px" }}>
-        <PgnLoader onGameLoad={handleGameLoaded} />
-        <PgnSaver
-          chessInstance={chess}
-          fileName={`${eventName || "partija"}.pgn`}
+        <PgnLoader
+          onGameLoad={handleGameLoaded}
+          onGamesLoad={handleGamesLoaded}
         />
+        <button onClick={addCurrentGameToCollection} className="chess-button">
+          Dodaj partiju u datoteku
+        </button>
+        <PgnSaver
+          pgnText={getCurrentGameWithHeaders().pgn()}
+          fileName={`${eventName || "partija"}.pgn`}
+          buttonText="Spremi trenutnu partiju"
+        />
+        {savedGames.length > 0 && (
+          <PgnSaver
+            pgnText={gamesPgn}
+            fileName={`${eventName || "partije"}.pgn`}
+            buttonText="Spremi sve partije"
+          />
+        )}
       </div>
     </div>
   );

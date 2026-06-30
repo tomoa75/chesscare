@@ -1,12 +1,20 @@
 import { useRef } from "react";
 import { Chess } from "chess.js";
 
+function splitPgnGames(pgnContent) {
+  return pgnContent
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n(?=\s*\[)/g)
+    .map((game) => game.trim())
+    .filter(Boolean);
+}
+
 /**
  * Komponenta za učitavanje PGN datoteke s hard diska.
  * @param {Object} props
  * @param {Function} props.onGameLoad - Callback funkcija koja prima novu, učitanu Chess instancu
  */
-function PgnLoader({ onGameLoad }) {
+function PgnLoader({ onGameLoad, onGamesLoad }) {
   // Koristimo ref kako bismo sakrili ružni nativni input i aktivirali ga preko ljepšeg gumba
   const fileInputRef = useRef(null);
 
@@ -28,14 +36,24 @@ function PgnLoader({ onGameLoad }) {
 
       try {
         // Kreiramo novu instancu šaha
-        const newGame = new Chess();
+        const loadedGames = splitPgnGames(pgnContent).map((singlePgn) => {
+          const game = new Chess();
+          game.loadPgn(singlePgn);
+          return game;
+        });
 
         // Učitavamo PGN sadržaj u nju
         // Napomena: .loadPgn() u modernim verzijama chess.js vraća objekt ili baca grešku ako PGN ne valja
-        newGame.loadPgn(pgnContent);
+        if (loadedGames.length === 0) {
+          throw new Error("PGN datoteka je prazna.");
+        }
 
         // Vraćamo novu igru natrag roditeljskoj komponenti
-        onGameLoad(newGame);
+        if (onGamesLoad) {
+          onGamesLoad(loadedGames);
+        } else {
+          onGameLoad(loadedGames[0]);
+        }
 
         // Resetiramo input kako bi se ista datoteka mogla ponovno učitati ako zatreba
         event.target.value = "";

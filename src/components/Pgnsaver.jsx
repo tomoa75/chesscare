@@ -4,20 +4,28 @@
  * @param {Object} props.chessInstance - Instanca 'Chess' klase iz chess.js biblioteke (npr. game ili chess)
  * @param {string} [props.fileName] - Neobavezno ime datoteke (default je 'partija.pgn')
  */
-function PgnSaver({ chessInstance, fileName = "partija.pgn" }) {
+function PgnSaver({
+  chessInstance,
+  pgnText,
+  fileName = "partija.pgn",
+  buttonText = "Spremi PGN datoteku",
+}) {
   const handleSavePgn = () => {
     // Provjera postoji li instanca i metoda kako bi se izbjegao crash
-    if (!chessInstance || typeof chessInstance.pgn !== "function") {
+    if (
+      typeof pgnText !== "string" &&
+      (!chessInstance || typeof chessInstance.pgn !== "function")
+    ) {
       console.error("PgnSaver: Proslijeđena instanca chess.js nije ispravna.");
       alert("Pogreška: Nemoguće generirati PGN.");
       return;
     }
 
     // 1. chess.js generira kompletan PGN string (uključujući sve tagove i poteze)
-    const pgnString = chessInstance.pgn();
+    const pgnString = typeof pgnText === "string" ? pgnText : chessInstance.pgn();
 
     if (!pgnString || pgnString.trim() === "") {
-      alert("Partija je prazna. Nema poteza za spremanje.");
+      alert("Nema partija za spremanje.");
       return;
     }
 
@@ -57,7 +65,7 @@ function PgnSaver({ chessInstance, fileName = "partija.pgn" }) {
         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
       }}
     >
-      Spremi PGN datoteku
+      {buttonText}
     </button>
   );
 }

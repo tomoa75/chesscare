@@ -12,6 +12,7 @@
   "dependencies": {
     "chess.js": "^1.4.0",
     "react": "^19.2.5",
+    "react-chessboard": "^4.5.0",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0"
   },
