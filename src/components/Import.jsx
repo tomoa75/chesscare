@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import PgnSaver from "./PgnSaver";
 import PgnLoader from "./PgnLoader";
 import Potez from "../assets/Potez";
+import { loadSavedGames, saveSavedGames } from "../gameStorage";
 
 import "../import.css"; // Uvezi CSS datoteku za dodatne stilove
 
@@ -29,7 +30,7 @@ export default function ChessGame() {
   const [blackPlayer, setBlackPlayer] = useState("");
   const [eventName, setEventName] = useState("");
   const [boardOrientation, setBoardOrientation] = useState("white");
-  const [savedGames, setSavedGames] = useState([]);
+  const [savedGames, setSavedGames] = useState(() => loadSavedGames());
   const [selectedSavedGameId, setSelectedSavedGameId] = useState("");
 
   // Prati koji potez trenutno gledamo (-1 znači početna pozicija)
@@ -41,6 +42,10 @@ export default function ChessGame() {
     () => savedGames.map((game) => game.pgn).join("\n\n"),
     [savedGames],
   );
+
+  useEffect(() => {
+    saveSavedGames(savedGames);
+  }, [savedGames]);
 
   // OPTIMIZACIJA: displayChess se rekreira samo kada se promijeni partija ili indeks poteza
   const displayChess = useMemo(() => {
