@@ -3,6 +3,7 @@ import Pocetna from "./components/Pocetna";
 import Import from "./components/Import";
 import Trening from "./components/Trening";
 import Statistika from "./components/Statistika";
+import "./App.css";
 
 // 1. Definiramo tri jednostavne komponente (stranice)
 

@@ -1,0 +1,12 @@
+nav a {
+  color: white;
+  font-size: 38px;
+  font-family: "Verdana", sans-serif;
+  font-weight: bold;
+  text-decoration: none;
+}
+nav {
+  display: flex;
+  justify-content: space-around;
+  background-color: #656363;
+}

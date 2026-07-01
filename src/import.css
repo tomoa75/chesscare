@@ -59,6 +59,11 @@ body {
   background: #0f0;
 }
 
+.chess-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .chess-reset-button {
   padding: 10px 20px;
   background: #d33;
@@ -68,6 +73,19 @@ body {
   height: 40px;
 }
 
+.chess-delete-move-button {
+  height: 40px;
+  padding: 10px 20px;
+  border: 1px solid #fff;
+  background: #8b1e1e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.chess-delete-move-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .chess-nav-button {
   padding: 10px 15px;
   font-size: 18px;

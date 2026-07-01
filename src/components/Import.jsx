@@ -8,6 +8,38 @@ import { loadSavedGames, saveSavedGames } from "../gameStorage";
 
 import "../import.css"; // Uvezi CSS datoteku za dodatne stilove
 
+const GAME_DRAFT_KEY = "chesscare-current-game-draft";
+
+function loadGameDraft() {
+  try {
+    const savedDraft = window.sessionStorage.getItem(GAME_DRAFT_KEY);
+    return savedDraft ? JSON.parse(savedDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function createChessFromDraft(draft) {
+  const restoredChess = new Chess();
+
+  if (!draft?.gamePgn) return restoredChess;
+
+  try {
+    restoredChess.loadPgn(draft.gamePgn);
+    return restoredChess;
+  } catch {
+    return new Chess();
+  }
+}
+
+function saveGameDraft(draft) {
+  try {
+    window.sessionStorage.setItem(GAME_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Partija i dalje radi ako preglednik blokira sessionStorage.
+  }
+}
+
 function createGameRecord(game, index) {
   const headers = game.header();
   const event = headers.Event || "Partija";
@@ -22,19 +54,34 @@ function createGameRecord(game, index) {
 }
 
 export default function ChessGame() {
-  const [chess, setChess] = useState(new Chess());
-  const [moveInput, setMoveInput] = useState("");
+  const [initialDraft] = useState(loadGameDraft);
+  const [chess, setChess] = useState(() => createChessFromDraft(initialDraft));
+  const [moveInput, setMoveInput] = useState(initialDraft?.moveInput || "");
   const [message, setMessage] = useState("");
-  const [pgn, setPgn] = useState("");
-  const [whitePlayer, setWhitePlayer] = useState("");
-  const [blackPlayer, setBlackPlayer] = useState("");
-  const [eventName, setEventName] = useState("");
-  const [boardOrientation, setBoardOrientation] = useState("white");
+  const [pgn, setPgn] = useState(
+    initialDraft?.displayPgn || initialDraft?.gamePgn || "",
+  );
+  const [whitePlayer, setWhitePlayer] = useState(
+    initialDraft?.whitePlayer || "",
+  );
+  const [blackPlayer, setBlackPlayer] = useState(
+    initialDraft?.blackPlayer || "",
+  );
+  const [eventName, setEventName] = useState(initialDraft?.eventName || "");
+  const [boardOrientation, setBoardOrientation] = useState(
+    initialDraft?.boardOrientation === "black" ? "black" : "white",
+  );
   const [savedGames, setSavedGames] = useState(() => loadSavedGames());
-  const [selectedSavedGameId, setSelectedSavedGameId] = useState("");
+  const [selectedSavedGameId, setSelectedSavedGameId] = useState(
+    initialDraft?.selectedSavedGameId || "",
+  );
 
   // Prati koji potez trenutno gledamo (-1 znači početna pozicija)
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(
+    Number.isInteger(initialDraft?.currentMoveIndex)
+      ? initialDraft.currentMoveIndex
+      : -1,
+  );
 
   // Dohvaćamo povijest glavne partije
   const history = chess.history();
@@ -46,6 +93,30 @@ export default function ChessGame() {
   useEffect(() => {
     saveSavedGames(savedGames);
   }, [savedGames]);
+
+  useEffect(() => {
+    saveGameDraft({
+      gamePgn: chess.pgn(),
+      displayPgn: pgn,
+      moveInput,
+      whitePlayer,
+      blackPlayer,
+      eventName,
+      boardOrientation,
+      currentMoveIndex,
+      selectedSavedGameId,
+    });
+  }, [
+    chess,
+    pgn,
+    moveInput,
+    whitePlayer,
+    blackPlayer,
+    eventName,
+    boardOrientation,
+    currentMoveIndex,
+    selectedSavedGameId,
+  ]);
 
   // OPTIMIZACIJA: displayChess se rekreira samo kada se promijeni partija ili indeks poteza
   const displayChess = useMemo(() => {
@@ -63,6 +134,10 @@ export default function ChessGame() {
       updatedChess.move(move);
     }
 
+    for (const [name, value] of Object.entries(chess.header())) {
+      updatedChess.header(name, value);
+    }
+
     updatedChess.header(
       "White",
       whitePlayer || "Bijeli",
@@ -75,9 +150,10 @@ export default function ChessGame() {
     return updatedChess;
   };
 
-  const handleGameLoaded = (loadedGame) => {
+  const handleGameLoaded = (loadedGame, savedGameId = "") => {
     setChess(loadedGame);
     setPgn(loadedGame.pgn());
+    setSelectedSavedGameId(savedGameId);
 
     const headers = loadedGame.header();
     setWhitePlayer(headers["White"] || "");
@@ -93,8 +169,7 @@ export default function ChessGame() {
     );
 
     setSavedGames(records);
-    setSelectedSavedGameId(records[0]?.id || "");
-    handleGameLoaded(loadedGames[0]);
+    handleGameLoaded(loadedGames[0], records[0]?.id || "");
     setMessage(`Ucitano partija iz datoteke: ${records.length}`);
   };
 
@@ -113,14 +188,36 @@ export default function ChessGame() {
     setMessage(`Partija dodana u zajednicku datoteku (${savedGames.length + 1}).`);
   };
 
+  const saveChangesToSelectedGame = () => {
+    if (!selectedSavedGameId) {
+      setMessage("Najprije odaberi partiju koju zelis azurirati.");
+      return;
+    }
+
+    const updatedGame = getCurrentGameWithHeaders();
+    const headers = updatedGame.header();
+    const title = `${headers.Event || "Partija"}: ${headers.White || "Bijeli"} - ${headers.Black || "Crni"}`;
+    const updatedPgn = updatedGame.pgn();
+
+    setSavedGames((games) =>
+      games.map((game) =>
+        game.id === selectedSavedGameId
+          ? { ...game, title, pgn: updatedPgn }
+          : game,
+      ),
+    );
+    setChess(updatedGame);
+    setPgn(updatedPgn);
+    setMessage("Promjene igraca i turnira spremljene su u partiju.");
+  };
+
   const loadSavedGame = (gameId) => {
     const record = savedGames.find((game) => game.id === gameId);
     if (!record) return;
 
     const loadedGame = new Chess();
     loadedGame.loadPgn(record.pgn);
-    setSelectedSavedGameId(gameId);
-    handleGameLoaded(loadedGame);
+    handleGameLoaded(loadedGame, gameId);
     setMessage(`Otvorena partija: ${record.title}`);
   };
 
@@ -213,6 +310,30 @@ export default function ChessGame() {
     setMessage("♻️ Partija resetirana");
   }
 
+  function deleteSelectedMove() {
+    if (currentMoveIndex < 0) return;
+
+    const deletedMove = history[currentMoveIndex];
+    const updatedChess = new Chess();
+
+    for (const move of history.slice(0, currentMoveIndex)) {
+      updatedChess.move(move);
+    }
+
+    updatedChess.header(
+      "White",
+      whitePlayer || "Bijeli",
+      "Black",
+      blackPlayer || "Crni",
+      "Event",
+      eventName || "Turnir",
+    );
+
+    setChess(updatedChess);
+    setPgn(updatedChess.pgn());
+    setCurrentMoveIndex(currentMoveIndex - 1);
+    setMessage(`Obrisan potez ${deletedMove} i svi potezi nakon njega.`);
+  }
   // Funkcije za navigaciju
   const jumpToStart = () => setCurrentMoveIndex(-1);
   const stepBackward = () =>
@@ -314,6 +435,15 @@ export default function ChessGame() {
         </button>
         <button onClick={resetGame} className="chess-reset-button">
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={deleteSelectedMove}
+          disabled={currentMoveIndex < 0}
+          className="chess-delete-move-button"
+          title="Briše označeni potez i sve poteze nakon njega"
+        >
+          Obriši označeni potez
         </button>
       </div>
 
@@ -450,6 +580,15 @@ export default function ChessGame() {
         />
         <button onClick={addCurrentGameToCollection} className="chess-button">
           Dodaj partiju u datoteku
+        </button>
+        <button
+          type="button"
+          onClick={saveChangesToSelectedGame}
+          disabled={!selectedSavedGameId}
+          className="chess-button"
+          title="Ažurira odabranu partiju novim imenima i nazivom turnira"
+        >
+          Spremi promjene u odabranu partiju
         </button>
         <PgnSaver
           pgnText={getCurrentGameWithHeaders().pgn()}

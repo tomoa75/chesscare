@@ -29,6 +29,44 @@ body {
   color: #cbd5e1;
 }
 
+.stats-analysis-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.stats-depth-control {
+  display: grid;
+  gap: 7px;
+  min-width: 190px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.stats-depth-control input {
+  width: 100%;
+  cursor: pointer;
+}
+
+.stats-depth-control input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stats-action {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #22c55e;
+  color: #052e16;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.stats-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 .stats-pill {
   padding: 8px 12px;
   color: #172554;
@@ -192,6 +230,11 @@ body {
   .stats-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .stats-analysis-controls {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
   }
 }
 

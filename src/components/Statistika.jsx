@@ -473,7 +473,9 @@ import { loadSavedGames, subscribeToSavedGames } from "../gameStorage";
 import "../statistika.css";
 
 const STOCKFISH_URL = `${import.meta.env.BASE_URL}stockfish/stockfish-18-lite-single.js`;
-const ANALYSIS_DEPTH = 8;
+const DEFAULT_ANALYSIS_DEPTH = 8;
+const MIN_ANALYSIS_DEPTH = 4;
+const MAX_ANALYSIS_DEPTH = 20;
 const PHASES = ["Otvaranje", "Sredisnjica", "Zavrsnica"];
 
 function clamp(value, min, max) {
@@ -604,7 +606,7 @@ function createStockfish() {
   });
 }
 
-function evaluateFen(worker, fen) {
+function evaluateFen(worker, fen, depth) {
   return new Promise((resolve) => {
     let latestScore = 0;
 
@@ -623,7 +625,7 @@ function evaluateFen(worker, fen) {
 
     worker.postMessage("stop");
     worker.postMessage(`position fen ${fen}`);
-    worker.postMessage(`go depth ${ANALYSIS_DEPTH}`);
+    worker.postMessage(`go depth ${depth}`);
   });
 }
 
@@ -764,6 +766,7 @@ function Statistika() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [report, setReport] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisDepth, setAnalysisDepth] = useState(DEFAULT_ANALYSIS_DEPTH);
 
   useEffect(() => subscribeToSavedGames(setSavedGames), []);
 
@@ -797,7 +800,7 @@ function Statistika() {
       for (let index = 0; index < uniqueFens.length; index += 1) {
         const fen = uniqueFens[index];
         setStatus(`Stockfish analizira poziciju ${index + 1}/${uniqueFens.length}`);
-        scores.set(fen, await evaluateFen(worker, fen));
+        scores.set(fen, await evaluateFen(worker, fen, analysisDepth));
         setProgress({ done: index + 1, total: uniqueFens.length });
       }
 
@@ -834,14 +837,28 @@ function Statistika() {
             stil igre.
           </p>
         </div>
-        <button
-          className="stats-action"
-          type="button"
-          onClick={startAnalysis}
-          disabled={isAnalyzing || tasks.length === 0}
-        >
-          {isAnalyzing ? "Analiziram..." : "Pokreni analizu"}
-        </button>
+        <div className="stats-analysis-controls">
+          <label className="stats-depth-control">
+            <span>Dubina analize: {analysisDepth}</span>
+            <input
+              type="range"
+              min={MIN_ANALYSIS_DEPTH}
+              max={MAX_ANALYSIS_DEPTH}
+              step="1"
+              value={analysisDepth}
+              onChange={(event) => setAnalysisDepth(Number(event.target.value))}
+              disabled={isAnalyzing}
+            />
+          </label>
+          <button
+            className="stats-action"
+            type="button"
+            onClick={startAnalysis}
+            disabled={isAnalyzing || tasks.length === 0}
+          >
+            {isAnalyzing ? "Analiziram..." : "Pokreni analizu"}
+          </button>
+        </div>
       </header>
 
       <section className="stats-section">
@@ -863,7 +880,7 @@ function Statistika() {
           />
         </div>
         <p className="stats-muted">
-          Dubina analize je {ANALYSIS_DEPTH}. Veca dubina je preciznija, ali puno
+          Odabrana dubina je {analysisDepth}. Veca dubina je preciznija, ali puno
           sporija za datoteke s vise partija.
         </p>
       </section>
