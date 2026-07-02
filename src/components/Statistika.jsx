@@ -477,6 +477,7 @@ const DEFAULT_ANALYSIS_DEPTH = 8;
 const MIN_ANALYSIS_DEPTH = 4;
 const MAX_ANALYSIS_DEPTH = 20;
 const PHASES = ["Otvaranje", "Sredisnjica", "Zavrsnica"];
+const MATE_SCORE = 1000;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -484,10 +485,11 @@ function clamp(value, min, max) {
 
 function scoreToWhitePerspective(score, fen) {
   const sideToMove = fen.split(" ")[1];
-  const value =
-    score.type === "mate"
-      ? Math.sign(score.value) * 100000
-      : Number(score.value);
+  const mateDirection = score.value >= 0 ? 1 : -1;
+  const mateDistance = Math.min(Math.abs(score.value), 100);
+  const value = score.type === "mate"
+    ? mateDirection * (MATE_SCORE - mateDistance)
+    : Number(score.value);
 
   return sideToMove === "w" ? value : -value;
 }
@@ -607,6 +609,12 @@ function createStockfish() {
 }
 
 function evaluateFen(worker, fen, depth) {
+  const position = new Chess(fen);
+
+  if (position.isCheckmate()) {
+    return Promise.resolve(position.turn() === "w" ? -MATE_SCORE : MATE_SCORE);
+  }
+
   return new Promise((resolve) => {
     let latestScore = 0;
 

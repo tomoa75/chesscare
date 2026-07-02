@@ -9,6 +9,8 @@ function PgnSaver({
   pgnText,
   fileName = "partija.pgn",
   buttonText = "Spremi PGN datoteku",
+  askForFileName = false,
+  onSave,
 }) {
   const handleSavePgn = () => {
     // Provjera postoji li instanca i metoda kako bi se izbjegao crash
@@ -30,6 +32,25 @@ function PgnSaver({
     }
 
     // 2. Pretvaranje stringa u Blob s odgovarajućim MIME tipom
+    let downloadFileName = fileName;
+
+    if (askForFileName) {
+      const enteredFileName = window.prompt(
+        "Unesi ime PGN datoteke:",
+        fileName.replace(/\.pgn$/i, ""),
+      );
+
+      if (enteredFileName === null) return;
+
+      const cleanedFileName = enteredFileName.trim();
+      if (!cleanedFileName) {
+        alert("Ime datoteke ne može biti prazno.");
+        return;
+      }
+
+      downloadFileName = cleanedFileName;
+    }
+
     const blob = new Blob([pgnString], {
       type: "application/x-chess-pgn;charset=utf-8",
     });
@@ -40,7 +61,10 @@ function PgnSaver({
     // 4. Kreiranje nevidljivog 'a' elementa koji glumi download gumb
     const link = document.createElement("a");
     link.href = url;
-    link.download = fileName.endsWith(".pgn") ? fileName : `${fileName}.pgn`;
+    const finalFileName = downloadFileName.toLowerCase().endsWith(".pgn")
+      ? downloadFileName
+      : `${downloadFileName}.pgn`;
+    link.download = finalFileName;
 
     // 5. Dodavanje u DOM, okidanje klika i micanje iz DOM-a
     document.body.appendChild(link);
@@ -49,6 +73,7 @@ function PgnSaver({
 
     // 6. Čišćenje memorije
     URL.revokeObjectURL(url);
+    onSave?.(finalFileName);
   };
 
   return (

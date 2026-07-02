@@ -50,7 +50,7 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
 
         // Vraćamo novu igru natrag roditeljskoj komponenti
         if (onGamesLoad) {
-          onGamesLoad(loadedGames);
+          onGamesLoad(loadedGames, file.name);
         } else {
           onGameLoad(loadedGames[0]);
         }

@@ -72,6 +72,12 @@ export default function ChessGame() {
     initialDraft?.boardOrientation === "black" ? "black" : "white",
   );
   const [savedGames, setSavedGames] = useState(() => loadSavedGames());
+  const [hasUnsavedGames, setHasUnsavedGames] = useState(false);
+  const [currentFileName, setCurrentFileName] = useState(
+    initialDraft?.currentFileName || "partije.pgn",
+  );
+  const safeCurrentFileName =
+    typeof currentFileName === "string" ? currentFileName : "partije.pgn";
   const [selectedSavedGameId, setSelectedSavedGameId] = useState(
     initialDraft?.selectedSavedGameId || "",
   );
@@ -95,6 +101,18 @@ export default function ChessGame() {
   }, [savedGames]);
 
   useEffect(() => {
+    if (!hasUnsavedGames) return undefined;
+
+    const warnAboutUnsavedGames = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", warnAboutUnsavedGames);
+    return () => window.removeEventListener("beforeunload", warnAboutUnsavedGames);
+  }, [hasUnsavedGames]);
+
+  useEffect(() => {
     saveGameDraft({
       gamePgn: chess.pgn(),
       displayPgn: pgn,
@@ -105,6 +123,7 @@ export default function ChessGame() {
       boardOrientation,
       currentMoveIndex,
       selectedSavedGameId,
+      currentFileName,
     });
   }, [
     chess,
@@ -116,6 +135,7 @@ export default function ChessGame() {
     boardOrientation,
     currentMoveIndex,
     selectedSavedGameId,
+    currentFileName,
   ]);
 
   // OPTIMIZACIJA: displayChess se rekreira samo kada se promijeni partija ili indeks poteza
@@ -163,12 +183,16 @@ export default function ChessGame() {
     setCurrentMoveIndex(loadedGame.history().length - 1);
     setMessage("📂 Partija uspješno učitana iz datoteke!");
   };
-  const handleGamesLoaded = (loadedGames) => {
+  const handleGamesLoaded = (loadedGames, loadedFileName) => {
     const records = loadedGames.map((game, index) =>
       createGameRecord(game, index),
     );
 
     setSavedGames(records);
+    if (typeof loadedFileName === "string" && loadedFileName.trim()) {
+      setCurrentFileName(loadedFileName);
+    }
+    setHasUnsavedGames(false);
     handleGameLoaded(loadedGames[0], records[0]?.id || "");
     setMessage(`Ucitano partija iz datoteke: ${records.length}`);
   };
@@ -183,6 +207,7 @@ export default function ChessGame() {
 
     const record = createGameRecord(currentGame, savedGames.length);
     setSavedGames((games) => [...games, record]);
+    setHasUnsavedGames(true);
     setSelectedSavedGameId(record.id);
     setPgn(currentGame.pgn());
     setMessage(`Partija dodana u zajednicku datoteku (${savedGames.length + 1}).`);
@@ -206,6 +231,7 @@ export default function ChessGame() {
           : game,
       ),
     );
+    setHasUnsavedGames(true);
     setChess(updatedGame);
     setPgn(updatedPgn);
     setMessage("Promjene igraca i turnira spremljene su u partiju.");
@@ -223,8 +249,46 @@ export default function ChessGame() {
 
   const removeSavedGame = (gameId) => {
     setSavedGames((games) => games.filter((game) => game.id !== gameId));
+    setHasUnsavedGames(true);
     if (selectedSavedGameId === gameId) {
       setSelectedSavedGameId("");
+    }
+  };
+
+  const appendCurrentGameToFile = async () => {
+    if (!("showOpenFilePicker" in window)) {
+      setMessage("Ova opcija zahtijeva Chrome ili Edge preglednik.");
+      return;
+    }
+
+    const currentPgn = getCurrentGameWithHeaders().pgn().trim();
+    if (!currentPgn) {
+      setMessage("Nema partije za dodavanje u datoteku.");
+      return;
+    }
+
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        types: [
+          {
+            description: "PGN datoteka",
+            accept: { "application/x-chess-pgn": [".pgn"] },
+          },
+        ],
+        multiple: false,
+      });
+      const file = await fileHandle.getFile();
+      setCurrentFileName(file.name);
+      const existingPgn = (await file.text()).trim();
+      const writable = await fileHandle.createWritable();
+      await writable.write(existingPgn ? `${existingPgn}\n\n${currentPgn}\n` : `${currentPgn}\n`);
+      await writable.close();
+      setMessage(`Partija je dodana u datoteku: ${file.name}`);
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        console.error("Ne mogu dodati partiju u PGN datoteku:", error);
+        setMessage("Dodavanje partije u odabranu datoteku nije uspjelo.");
+      }
     }
   };
 
@@ -532,7 +596,29 @@ export default function ChessGame() {
 
       <div className="chess-info">
         <h2>Partije u datoteci</h2>
+        <p>
+          Trenutno otvorena: <strong>{safeCurrentFileName}</strong>
+        </p>
+        <label className="current-file-name">
+          <span>Ime otvorene datoteke</span>
+          <input
+            type="text"
+            value={safeCurrentFileName}
+            onChange={(event) => {
+              setCurrentFileName(event.target.value);
+              setHasUnsavedGames(true);
+            }}
+            className="chess-input"
+            aria-label="Ime otvorene PGN datoteke"
+          />
+        </label>
         <p>Broj partija: {savedGames.length}</p>
+        {hasUnsavedGames && (
+          <p className="unsaved-games-warning" role="alert">
+            ⚠ Imate nespremljene promjene u zbirci partija. Odaberite
+            &quot;Spremi sve partije&quot; prije zatvaranja aplikacije.
+          </p>
+        )}
 
         {savedGames.length > 0 && (
           <>
@@ -595,11 +681,23 @@ export default function ChessGame() {
           fileName={`${eventName || "partija"}.pgn`}
           buttonText="Spremi trenutnu partiju"
         />
+        <button
+          type="button"
+          onClick={appendCurrentGameToFile}
+          className="chess-button"
+        >
+          Dodaj trenutnu partiju u postojeću datoteku
+        </button>
         {savedGames.length > 0 && (
           <PgnSaver
             pgnText={gamesPgn}
-            fileName={`${eventName || "partije"}.pgn`}
+            fileName={safeCurrentFileName.trim() || "partije.pgn"}
             buttonText="Spremi sve partije"
+            askForFileName
+            onSave={(savedFileName) => {
+              setCurrentFileName(savedFileName);
+              setHasUnsavedGames(false);
+            }}
           />
         )}
       </div>

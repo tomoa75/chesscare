@@ -144,3 +144,21 @@ body {
   background: #d33;
   color: #fff;
 }
+
+.unsaved-games-warning {
+  max-width: 700px;
+  padding: 12px 14px;
+  border: 1px solid #d49a00;
+  border-radius: 6px;
+  background: #fff3cd;
+  color: #664d03;
+  font-weight: 600;
+}
+
+.current-file-name {
+  display: grid;
+  gap: 6px;
+  max-width: 500px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
