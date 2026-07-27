@@ -1,12 +1,25 @@
 nav a {
   color: white;
-  font-size: 38px;
+  font-size: clamp(18px, 2.4vw, 38px);
   font-family: "Verdana", sans-serif;
   font-weight: bold;
   text-decoration: none;
 }
 nav {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
   justify-content: space-around;
+  padding: 8px 12px;
   background-color: #656363;
+}
+
+.route-loading {
+  display: grid;
+  min-height: calc(100vh - 64px);
+  place-items: center;
+  margin: 0;
+  color: #555950;
+  background: #f3f1ea;
+  font: 700 18px Verdana, sans-serif;
 }

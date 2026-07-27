@@ -1,0 +1,337 @@
+.player-dashboard {
+  min-height: calc(100vh - 64px);
+  padding: clamp(20px, 4vw, 52px);
+  color: #20221e;
+  background:
+    radial-gradient(circle at top right, rgba(111, 136, 92, 0.18), transparent 34%),
+    #f5f2ea;
+}
+
+.player-dashboard-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  max-width: 1180px;
+  margin: 0 auto 28px;
+}
+
+.player-dashboard-header h1 {
+  margin: 4px 0 8px;
+  font-family: Georgia, serif;
+  font-size: clamp(34px, 5vw, 62px);
+  font-weight: 500;
+}
+
+.player-dashboard-header p {
+  max-width: 700px;
+  margin: 0;
+  color: #5c6258;
+  line-height: 1.6;
+}
+
+.player-dashboard-eyebrow {
+  color: #697c56;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.player-selector {
+  display: grid;
+  gap: 7px;
+  min-width: min(330px, 100%);
+  font-weight: 700;
+}
+
+.player-selector select {
+  padding: 12px 14px;
+  border: 1px solid #bbc2b2;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+}
+
+.player-dashboard-state,
+.player-profile-summary,
+.player-report-section,
+.weakest-phase,
+.player-dashboard-warnings,
+.player-period-controls,
+.player-period-note,
+.player-period-error {
+  max-width: 1180px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.player-period-controls {
+  display: grid;
+  grid-template-columns: 1fr minmax(150px, auto) minmax(150px, auto) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 17px 19px;
+  border: 1px solid #d3d5cb;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.player-period-controls > div,
+.player-period-controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.player-period-controls > div span,
+.player-period-controls label span {
+  color: #687064;
+}
+
+.player-period-controls input,
+.player-period-controls button,
+.player-period-reset {
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #abb5a5;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
+.player-period-controls button,
+.player-period-reset {
+  color: #fff;
+  background: #5a7050;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.player-period-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.player-period-error {
+  padding: 13px 17px;
+  border: 1px solid #c98e85;
+  border-radius: 9px;
+  color: #782f27;
+  background: #f8e5e2;
+}
+
+.player-period-note {
+  margin-top: 18px;
+  padding: 13px 17px;
+  border-radius: 8px;
+  color: #53604f;
+  background: #e8eee4;
+}
+
+.player-dashboard-state {
+  padding: 42px;
+  border: 1px solid #d8d4c9;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: center;
+}
+
+.player-dashboard-state a {
+  color: #526744;
+  font-weight: 800;
+}
+
+.player-dashboard-error {
+  border-color: #c98e85;
+}
+
+.player-profile-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #d3d5cb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(50, 55, 44, 0.08);
+}
+
+.player-profile-summary > div {
+  display: grid;
+  gap: 5px;
+  padding: 20px;
+  border-right: 1px solid #e5e6df;
+}
+
+.player-profile-summary > div:last-child {
+  border-right: 0;
+}
+
+.player-profile-summary span,
+.player-profile-summary small,
+.player-group-card span,
+.player-report-note,
+.analysis-source-list span {
+  color: #687064;
+}
+
+.player-profile-summary strong {
+  font-size: clamp(20px, 2.4vw, 30px);
+}
+
+.player-dashboard-warnings {
+  display: grid;
+  gap: 8px;
+  padding: 18px 22px 18px 42px;
+  border: 1px solid #d7a36c;
+  border-radius: 12px;
+  background: #fff4e5;
+}
+
+.player-dashboard-warnings li span {
+  margin-left: 8px;
+}
+
+.player-report-section {
+  margin-top: 34px;
+}
+
+.player-report-section h2 {
+  margin-bottom: 14px;
+  font-family: Georgia, serif;
+  font-size: 27px;
+  font-weight: 500;
+}
+
+.classification-grid,
+.player-group-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.classification-grid article {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 18px;
+  border-left: 4px solid #758a63;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.classification-grid strong {
+  font-size: 28px;
+}
+
+.player-group-card {
+  padding: 20px;
+  border: 1px solid #d8dbd1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.player-group-card h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.player-group-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.player-group-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.player-group-card dt {
+  color: #687064;
+}
+
+.player-group-card dd {
+  margin: 0;
+  font-weight: 750;
+  text-align: right;
+}
+
+.weakest-phase {
+  display: grid;
+  gap: 5px;
+  margin-top: 22px;
+  padding: 18px 22px;
+  border-left: 5px solid #a7654d;
+  border-radius: 8px;
+  background: #f5e8df;
+}
+
+.weakest-phase strong {
+  font-size: 21px;
+}
+
+.analysis-source-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-source-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+  border: 1px solid #d8dbd1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.analysis-source-list article div {
+  display: grid;
+  gap: 4px;
+}
+
+.analysis-source-list code {
+  color: #687064;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 850px) {
+  .player-dashboard-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .player-profile-summary,
+  .classification-grid,
+  .player-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .player-period-controls {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .player-profile-summary > div {
+    border-bottom: 1px solid #e5e6df;
+  }
+}
+
+@media (max-width: 540px) {
+  .player-profile-summary,
+  .classification-grid,
+  .player-group-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-source-list article {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .player-period-controls {
+    grid-template-columns: 1fr;
+  }
+}

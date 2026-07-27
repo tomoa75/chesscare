@@ -1,0 +1,287 @@
+.training-progress-page {
+  min-height: calc(100vh - 64px);
+  padding: clamp(20px, 4vw, 50px);
+  color: #20231f;
+  background:
+    radial-gradient(circle at 90% 5%, rgba(79, 111, 92, 0.14), transparent 30%),
+    #f3f1ea;
+}
+
+.training-progress-header,
+.training-progress-summary,
+.training-progress-section,
+.training-progress-state,
+.training-progress-warnings {
+  max-width: 1160px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.training-progress-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 26px;
+}
+
+.training-progress-header > div > span {
+  color: #55705e;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.training-progress-header h1 {
+  margin: 5px 0 8px;
+  font: 500 clamp(34px, 5vw, 59px) Georgia, serif;
+}
+
+.training-progress-header p {
+  max-width: 690px;
+  margin: 0;
+  color: #656b63;
+  line-height: 1.6;
+}
+
+.training-progress-header label {
+  display: grid;
+  gap: 7px;
+  min-width: min(320px, 100%);
+  font-weight: 800;
+}
+
+.training-progress-header select {
+  min-height: 45px;
+  padding: 10px 13px;
+  border: 1px solid #acb3a9;
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+}
+
+.training-progress-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  border: 1px solid #d5d8d1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(48, 58, 49, 0.07);
+}
+
+.training-progress-summary article {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border-right: 1px solid #e5e7e1;
+}
+
+.training-progress-summary article:last-child {
+  border-right: 0;
+}
+
+.training-progress-summary span,
+.training-progress-summary small,
+.training-progress-group-heading span,
+.training-progress-note,
+.training-recent-attempts span {
+  color: #697068;
+}
+
+.training-progress-summary strong {
+  font-size: 29px;
+}
+
+.training-progress-section {
+  margin-top: 32px;
+}
+
+.training-progress-section h2 {
+  margin-bottom: 14px;
+  font: 500 28px Georgia, serif;
+}
+
+.training-progress-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.training-outcome-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  border: 1px solid #d7dad3;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.training-outcome-summary article {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border-right: 1px solid #e5e7e1;
+  text-align: center;
+}
+
+.training-outcome-summary strong {
+  font-size: 25px;
+}
+
+.training-schedule-summary {
+  display: grid;
+  gap: 7px;
+  padding: 14px 17px;
+  border: 1px solid #d7dad3;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.training-schedule-summary div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.training-progress-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.training-progress-groups > article {
+  padding: 18px;
+  border: 1px solid #d7dad3;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.training-progress-group-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.training-progress-group-heading h3 {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.training-progress-group-heading > strong {
+  font-size: 24px;
+}
+
+.training-progress-track {
+  height: 7px;
+  overflow: hidden;
+  margin: 15px 0;
+  border-radius: 999px;
+  background: #e3e6e0;
+}
+
+.training-progress-track div {
+  height: 100%;
+  background: #5f7d66;
+}
+
+.training-progress-groups dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.training-progress-groups dl div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.training-progress-groups dt {
+  color: #6b726a;
+}
+
+.training-progress-groups dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.training-recent-attempts {
+  display: grid;
+  gap: 8px;
+}
+
+.training-recent-attempts article {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 18px;
+  border: 1px solid #d7dad3;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.training-recent-attempts article div {
+  display: grid;
+  gap: 3px;
+}
+
+.training-recent-attempts article div:last-child {
+  text-align: right;
+}
+
+.training-progress-warnings {
+  margin-top: 18px;
+  padding: 16px 20px 16px 42px;
+  border: 1px solid #c89468;
+  border-radius: 10px;
+  background: #fff0e2;
+}
+
+.training-progress-state {
+  padding: 36px;
+  border: 1px solid #d5d8d1;
+  border-radius: 13px;
+  background: #fff;
+  text-align: center;
+}
+
+.training-progress-state a {
+  color: #4f6d56;
+  font-weight: 800;
+}
+
+.training-progress-error {
+  border-color: #bd8178;
+}
+
+@media (max-width: 880px) {
+  .training-progress-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .training-progress-summary,
+  .training-progress-groups {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .training-progress-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .training-progress-summary,
+  .training-progress-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .training-recent-attempts article {
+    flex-direction: column;
+  }
+
+  .training-recent-attempts article div:last-child {
+    text-align: left;
+  }
+}
