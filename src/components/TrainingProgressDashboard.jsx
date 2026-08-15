@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadTrainingProgress } from "../domain/trainingProgressService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import "../trainingProgressDashboard.css";
@@ -113,9 +114,7 @@ export default function TrainingProgressDashboard() {
 
     const load = async () => {
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
+        const repository = createBrowserDomainRepository(window);
         const data = await loadTrainingProgress({ repository, playerId });
         if (active) setState({ status: "ready", data, error: null });
       } catch (error) {
@@ -127,12 +126,17 @@ export default function TrainingProgressDashboard() {
 
     void load();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void load();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void load();
     };
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     };
   }, [playerId]);
 

@@ -42,6 +42,15 @@ async function previewToken(snapshot, runId, playerId) {
   )}`;
 }
 
+async function allCompletedPreviewToken(snapshot, playerId) {
+  return `sha256:${await sha256Hex(
+    stableStringify({
+      snapshot,
+      request: { mode: "all-completed-runs", playerId },
+    }),
+  )}`;
+}
+
 function warning(code, message, context = {}) {
   return {
     code,
@@ -246,3 +255,219 @@ export async function confirmPersonalizedMaterialization(options) {
   };
 }
 
+function completedRunAssignments(snapshot, playerId) {
+  const linkedGames = snapshot.games.filter(
+    (game) =>
+      game.players.whitePlayerId === playerId ||
+      game.players.blackPlayerId === playerId,
+  );
+  const completedRuns = snapshot.analysisRuns
+    .filter((run) => run.status === "completed")
+    .sort(
+      (left, right) =>
+        (right.completedAt || "").localeCompare(left.completedAt || "") ||
+        right.id.localeCompare(left.id),
+    );
+  const assignments = new Map();
+  const diagnostics = [];
+
+  for (const game of linkedGames) {
+    const run = completedRuns.find((candidate) =>
+      candidate.gameIds.includes(game.id),
+    );
+
+    diagnostics.push({
+      gameId: game.id,
+      title: game.title,
+      white: game.headers.White || "Bijeli",
+      black: game.headers.Black || "Crni",
+      linkedPlayerId: playerId,
+      analysisRunId: run?.id || null,
+      analysisStatus: run?.status || "not-completed",
+    });
+
+    if (!run) continue;
+    const assignment = assignments.get(run.id) || { run, games: [] };
+    assignment.games.push(game);
+    assignments.set(run.id, assignment);
+  }
+
+  return {
+    linkedGames,
+    assignments: [...assignments.values()],
+    diagnostics,
+  };
+}
+
+function compareCandidates(candidate, existing) {
+  return stableStringify(existing) === stableStringify(candidate);
+}
+
+export async function createAllCompletedPersonalizedMaterializationPreview(
+  options,
+) {
+  if (!options?.repository?.readSnapshot) {
+    throw new TypeError("Repozitorij mora podrzavati readSnapshot.");
+  }
+  if (typeof options.playerId !== "string" || !options.playerId.trim()) {
+    throw new TypeError("ID profila igraca mora biti neprazan string.");
+  }
+
+  const playerId = options.playerId.trim();
+  const snapshot = await options.repository.readSnapshot();
+  const player = snapshot.players.find((item) => item.id === playerId);
+
+  if (!player) {
+    throw new PersonalizedMaterializationError(
+      "player-not-found",
+      `Profil igraca '${playerId}' ne postoji.`,
+    );
+  }
+
+  const selected = completedRunAssignments(snapshot, playerId);
+  const builds = await Promise.all(
+    selected.assignments.map(async ({ run, games }) => ({
+      run,
+      games,
+      built: await buildPersonalizedMoveAnalyses({
+        games,
+        player,
+        positionEvaluations: snapshot.positionEvaluations,
+        engine: run.engine,
+        settings: run.settings,
+        analysisRunId: run.id,
+      }),
+    })),
+  );
+  const moveAnalyses = builds.flatMap((item) => item.built.moveAnalyses);
+  const warnings = builds.flatMap((item) => item.built.warnings);
+  const existingById = new Map(
+    snapshot.moveAnalyses.map((analysis) => [analysis.id, analysis]),
+  );
+  const toAdd = [];
+  const unchanged = [];
+  const conflicts = [];
+
+  for (const candidate of moveAnalyses) {
+    const existing = existingById.get(candidate.id);
+    if (!existing) {
+      toAdd.push(candidate);
+    } else if (compareCandidates(candidate, existing)) {
+      unchanged.push(candidate.id);
+    } else {
+      conflicts.push({
+        code: "move-analysis-conflict",
+        moveAnalysisId: candidate.id,
+        gameId: candidate.gameId,
+        ply: candidate.ply,
+      });
+    }
+  }
+
+  const movesPerGame = new Map();
+  for (const move of moveAnalyses) {
+    movesPerGame.set(move.gameId, (movesPerGame.get(move.gameId) || 0) + 1);
+  }
+  const diagnostics = selected.diagnostics.map((item) => ({
+    ...item,
+    savedAnalyzedMoves: snapshot.moveAnalyses.filter(
+      (move) => move.playerId === playerId && move.gameId === item.gameId,
+    ).length,
+    generatedAnalyzedMoves: movesPerGame.get(item.gameId) || 0,
+  }));
+  const blockingWarnings = warnings.filter((item) =>
+    BLOCKING_WARNING_CODES.has(item.code),
+  );
+
+  return {
+    token: await allCompletedPreviewToken(snapshot, playerId),
+    mode: "all-completed-runs",
+    runs: builds.map(({ run, games }) => ({
+      id: run.id,
+      gameIds: games.map((game) => game.id),
+      engine: { ...run.engine },
+      settings: {
+        ...run.settings,
+        uciOptions: { ...run.settings.uciOptions },
+      },
+    })),
+    player: {
+      id: player.id,
+      displayName: player.displayName,
+      aliases: [...player.aliases],
+    },
+    gameMatches: builds.flatMap((item) => item.built.gameMatches),
+    diagnostics,
+    warnings,
+    blockingWarnings,
+    conflicts,
+    moveAnalyses,
+    toAdd,
+    summary: {
+      runsMatched: builds.length,
+      gamesInRun: selected.linkedGames.length,
+      gamesMatched: new Set(
+        builds.flatMap((item) =>
+          item.built.gameMatches.map((match) => match.gameId),
+        ),
+      ).size,
+      playerMoveContexts: builds.reduce(
+        (total, item) => total + item.built.contexts.length,
+        0,
+      ),
+      generated: moveAnalyses.length,
+      toAdd: toAdd.length,
+      unchanged: unchanged.length,
+      conflicts: conflicts.length,
+      warnings: warnings.length,
+    },
+    canMaterialize:
+      moveAnalyses.length > 0 &&
+      blockingWarnings.length === 0 &&
+      conflicts.length === 0,
+  };
+}
+
+export async function confirmAllCompletedPersonalizedMaterialization(options) {
+  if (!options?.repository?.replaceSnapshot) {
+    throw new TypeError("Repozitorij mora podrzavati replaceSnapshot.");
+  }
+  if (typeof options.previewToken !== "string" || !options.previewToken.trim()) {
+    throw new PersonalizedMaterializationError(
+      "confirmation-required",
+      "Materijalizacija zahtijeva token potvrdenog previewa.",
+    );
+  }
+
+  const preview =
+    await createAllCompletedPersonalizedMaterializationPreview(options);
+  if (preview.token !== options.previewToken) {
+    throw new PersonalizedMaterializationError(
+      "stale-preview",
+      "Domenski podaci promijenili su se nakon previewa.",
+    );
+  }
+  if (!preview.canMaterialize) {
+    throw new PersonalizedMaterializationError(
+      "materialization-blocked",
+      "Personalizirani rezultati imaju blokirajuce upozorenje ili konflikt.",
+    );
+  }
+  if (preview.toAdd.length === 0) {
+    return {
+      status: "no-changes",
+      added: 0,
+      unchanged: preview.summary.unchanged,
+    };
+  }
+
+  const snapshot = await options.repository.readSnapshot();
+  snapshot.moveAnalyses.push(...preview.toAdd);
+  await options.repository.replaceSnapshot(snapshot);
+
+  return {
+    status: "materialized",
+    added: preview.toAdd.length,
+    unchanged: preview.summary.unchanged,
+  };
+}

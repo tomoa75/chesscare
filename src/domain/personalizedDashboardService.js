@@ -1,4 +1,5 @@
 import { buildPersonalizedPlayerReport } from "./playerAnalysisService.js";
+import { selectCurrentMoveAnalyses } from "./currentMoveAnalysisService.js";
 
 function uniqueCount(values) {
   return new Set(values).size;
@@ -63,8 +64,12 @@ export async function loadPersonalizedDashboard(options) {
   }
 
   const snapshot = await options.repository.readSnapshot();
+  const currentMoveAnalyses = selectCurrentMoveAnalyses(
+    snapshot.moveAnalyses,
+    snapshot.analysisRuns,
+  );
   const players = snapshot.players
-    .map((player) => playerOption(player, snapshot.moveAnalyses))
+    .map((player) => playerOption(player, currentMoveAnalyses))
     .sort((left, right) =>
       left.displayName.localeCompare(right.displayName),
     );
@@ -77,8 +82,11 @@ export async function loadPersonalizedDashboard(options) {
     throw new TypeError(`Profil igraca '${playerId}' ne postoji.`);
   }
 
-  const playerMoves = player
+  const rawPlayerMoves = player
     ? snapshot.moveAnalyses.filter((move) => move.playerId === player.id)
+    : [];
+  const playerMoves = player
+    ? currentMoveAnalyses.filter((move) => move.playerId === player.id)
     : [];
   const knownGameIds = new Set(snapshot.games.map((game) => game.id));
   const knownRunIds = new Set(
@@ -126,7 +134,7 @@ export async function loadPersonalizedDashboard(options) {
     report: player
       ? buildPersonalizedPlayerReport({
           player,
-          moveAnalyses: snapshot.moveAnalyses,
+          moveAnalyses: currentMoveAnalyses,
           games: snapshot.games,
           period: options.period,
         })
@@ -141,6 +149,7 @@ export async function loadPersonalizedDashboard(options) {
         .length,
       totalMoveAnalyses: snapshot.moveAnalyses.length,
       selectedMoveAnalyses: playerMoves.length,
+      supersededMoveAnalyses: rawPlayerMoves.length - playerMoves.length,
     },
   };
 }

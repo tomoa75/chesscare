@@ -1,20 +1,15 @@
 import { useRef } from "react";
-import { Chess } from "chess.js";
-
-function splitPgnGames(pgnContent) {
-  return pgnContent
-    .replace(/\r\n/g, "\n")
-    .split(/\n\s*\n(?=\s*\[)/g)
-    .map((game) => game.trim())
-    .filter(Boolean);
-}
+import {
+  isAcceptedLegacyPgnFile,
+  parsePgnCollection,
+} from "../domain/pgnService";
 
 /**
  * Komponenta za učitavanje PGN datoteke s hard diska.
  * @param {Object} props
  * @param {Function} props.onGameLoad - Callback funkcija koja prima novu, učitanu Chess instancu
  */
-function PgnLoader({ onGameLoad, onGamesLoad }) {
+function PgnLoader({ onGameLoad, onGamesLoad, disabled = false }) {
   // Koristimo ref kako bismo sakrili ružni nativni input i aktivirali ga preko ljepšeg gumba
   const fileInputRef = useRef(null);
 
@@ -23,7 +18,7 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
     if (!file) return;
 
     // Provjera ekstenzije (opcionalno, ali korisno)
-    if (!file.name.endsWith(".pgn") && file.type !== "text/plain") {
+    if (!isAcceptedLegacyPgnFile(file)) {
       alert("Molimo odaberite ispravnu .pgn datoteku.");
       return;
     }
@@ -36,18 +31,10 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
 
       try {
         // Kreiramo novu instancu šaha
-        const loadedGames = splitPgnGames(pgnContent).map((singlePgn) => {
-          const game = new Chess();
-          game.loadPgn(singlePgn);
-          return game;
-        });
+        const loadedGames = parsePgnCollection(pgnContent);
 
         // Učitavamo PGN sadržaj u nju
         // Napomena: .loadPgn() u modernim verzijama chess.js vraća objekt ili baca grešku ako PGN ne valja
-        if (loadedGames.length === 0) {
-          throw new Error("PGN datoteka je prazna.");
-        }
-
         // Vraćamo novu igru natrag roditeljskoj komponenti
         if (onGamesLoad) {
           onGamesLoad(loadedGames, file.name);
@@ -68,6 +55,7 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
   };
 
   const triggerFileSelect = () => {
+    if (disabled) return;
     fileInputRef.current.click();
   };
 
@@ -84,7 +72,9 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
 
       {/* Naš lijepo stilizirani gumb koji glumi input */}
       <button
+        type="button"
         onClick={triggerFileSelect}
+        disabled={disabled}
         style={{
           padding: "10px 16px",
           backgroundColor: "#007bff",
@@ -92,7 +82,8 @@ function PgnLoader({ onGameLoad, onGamesLoad }) {
           border: "none",
           borderRadius: "4px",
           fontWeight: "bold",
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
           boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         }}
       >

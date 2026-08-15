@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Chessboard } from "react-chessboard";
 import { Link } from "react-router-dom";
 import { loadPersonalizedDashboard } from "../domain/personalizedDashboardService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import "../personalizedDashboard.css";
@@ -32,6 +34,25 @@ const CONFIDENCE_LABELS = {
   medium: "srednji uzorak",
   high: "veliki uzorak",
 };
+
+const PRIORITY_DIMENSION_LABELS = {
+  phase: {
+    opening: "Otvaranje",
+    middlegame: "Sredisnjica",
+    endgame: "Zavrsnica",
+  },
+  color: {
+    white: "Igra bijelim",
+    black: "Igra crnim",
+  },
+};
+
+function priorityTitle(priority) {
+  const focus =
+    PRIORITY_DIMENSION_LABELS[priority.dimension]?.[priority.key] ||
+    priority.key;
+  return `${focus}: ${CLASSIFICATION_LABELS[priority.classification]}`;
+}
 
 function formatNumber(value, maximumFractionDigits = 1) {
   return new Intl.NumberFormat("hr-HR", {
@@ -74,6 +95,7 @@ function MetricGroup({ title, groups }) {
 export default function PersonalizedDashboard() {
   const [playerId, setPlayerId] = useState("");
   const [period, setPeriod] = useState({ from: "", to: "" });
+  const [selectedEvidence, setSelectedEvidence] = useState(null);
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -93,9 +115,7 @@ export default function PersonalizedDashboard() {
       }));
 
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
+        const repository = createBrowserDomainRepository(window);
         const data = await loadPersonalizedDashboard({
           repository,
           playerId,
@@ -113,11 +133,22 @@ export default function PersonalizedDashboard() {
     const handleStorage = (event) => {
       if (event.key === DOMAIN_STORAGE_KEY) void load();
     };
+    const handleDomainChange = (event) => {
+      if (event.detail?.key === DOMAIN_STORAGE_KEY) void load();
+    };
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(
+      DOMAIN_STORAGE_CHANGED_EVENT,
+      handleDomainChange,
+    );
 
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        DOMAIN_STORAGE_CHANGED_EVENT,
+        handleDomainChange,
+      );
     };
   }, [period, playerId]);
 
@@ -163,7 +194,10 @@ export default function PersonalizedDashboard() {
           <span>Profil</span>
           <select
             value={playerId}
-            onChange={(event) => setPlayerId(event.target.value)}
+            onChange={(event) => {
+              setPlayerId(event.target.value);
+              setSelectedEvidence(null);
+            }}
           >
             <option value="">Odaberi igraca</option>
             {data.players.map((player) => (
@@ -190,10 +224,13 @@ export default function PersonalizedDashboard() {
               value={period.from}
               max={period.to || undefined}
               onChange={(event) =>
-                setPeriod((current) => ({
-                  ...current,
-                  from: event.target.value,
-                }))
+                {
+                  setSelectedEvidence(null);
+                  setPeriod((current) => ({
+                    ...current,
+                    from: event.target.value,
+                  }));
+                }
               }
             />
           </label>
@@ -204,16 +241,22 @@ export default function PersonalizedDashboard() {
               value={period.to}
               min={period.from || undefined}
               onChange={(event) =>
-                setPeriod((current) => ({
-                  ...current,
-                  to: event.target.value,
-                }))
+                {
+                  setSelectedEvidence(null);
+                  setPeriod((current) => ({
+                    ...current,
+                    to: event.target.value,
+                  }));
+                }
               }
             />
           </label>
           <button
             type="button"
-            onClick={() => setPeriod({ from: "", to: "" })}
+            onClick={() => {
+              setPeriod({ from: "", to: "" });
+              setSelectedEvidence(null);
+            }}
             disabled={!period.from && !period.to}
           >
             Ponisti
@@ -257,7 +300,10 @@ export default function PersonalizedDashboard() {
               <button
                 type="button"
                 className="player-period-reset"
-                onClick={() => setPeriod({ from: "", to: "" })}
+                onClick={() => {
+                  setPeriod({ from: "", to: "" });
+                  setSelectedEvidence(null);
+                }}
               >
                 Prikazi cijelo razdoblje
               </button>
@@ -304,6 +350,14 @@ export default function PersonalizedDashboard() {
             </div>
           </section>
 
+          {data.summary.supersededMoveAnalyses > 0 && (
+            <p className="player-period-note">
+              Profil koristi najnoviju zavrsenu analizu svakog poteza.
+              Zanemareno starijih rezultata:{" "}
+              {data.summary.supersededMoveAnalyses}.
+            </p>
+          )}
+
           {data.warnings.length > 0 && (
             <ul className="player-dashboard-warnings">
               {data.warnings.map((warning) => (
@@ -327,6 +381,150 @@ export default function PersonalizedDashboard() {
                 ),
               )}
             </div>
+          </section>
+
+          <section className="player-report-section">
+            <h2>Preciznost po partijama</h2>
+            <p className="player-report-note">
+              Svaka partija prikazuje preciznost iz analiziranih poteza
+              odabranog igraca.
+            </p>
+            <div className="player-game-list">
+              {report.byGame.map((game) => (
+                <article key={game.gameId}>
+                  <div className="player-game-heading">
+                    <div>
+                      <h3>{game.title}</h3>
+                      <span>
+                        {game.date || "Datum nije naveden"} · rezultat{" "}
+                        {GROUP_LABELS[game.result] || game.result}
+                      </span>
+                    </div>
+                    <div className="player-game-accuracy">
+                      <strong>{formatNumber(game.accuracy)}%</strong>
+                      <span>preciznost</span>
+                    </div>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Analizirani potezi</dt>
+                      <dd>{game.sampleSize}</dd>
+                    </div>
+                    <div>
+                      <dt>Prosjecni gubitak</dt>
+                      <dd>{formatNumber(game.averageLoss)} cp</dd>
+                    </div>
+                    <div>
+                      <dt>Dobri</dt>
+                      <dd>{game.classifications.good}</dd>
+                    </div>
+                    <div>
+                      <dt>Nepreciznosti</dt>
+                      <dd>{game.classifications.inaccuracy}</dd>
+                    </div>
+                    <div>
+                      <dt>Pogreske</dt>
+                      <dd>{game.classifications.mistake}</dd>
+                    </div>
+                    <div>
+                      <dt>Velike pogreske</dt>
+                      <dd>{game.classifications.blunder}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="player-report-section player-priorities">
+            <h2>Tri prioriteta za napredak</h2>
+            {report.priorities.length === 0 ? (
+              <p className="player-report-note">
+                U odabranom uzorku nema poteza klasificiranih kao
+                nepreciznost, pogreska ili velika pogreska.
+              </p>
+            ) : (
+              <div className="player-priority-list">
+                {report.priorities.map((priority) => (
+                  <article key={priority.id}>
+                    <div className="player-priority-heading">
+                      <span>Prioritet {priority.rank}</span>
+                      <h3>{priorityTitle(priority)}</h3>
+                    </div>
+                    <p>
+                      {priority.occurrences} pojavljivanja u{" "}
+                      {priority.gameCount} partija; prosjecni gubitak{" "}
+                      {formatNumber(priority.averageLoss)} cp.
+                    </p>
+                    <small>
+                      {priority.recurring
+                        ? "Ponavljajuca slabost"
+                        : "Slabost iz jednog zabiljezenog primjera"}
+                    </small>
+                    <div className="player-priority-evidence-list">
+                      {priority.evidence.map((evidence, index) => (
+                        <button
+                          type="button"
+                          key={evidence.moveAnalysisId}
+                          onClick={() =>
+                            setSelectedEvidence({ priority, evidence })
+                          }
+                        >
+                          Otvori dokaz {index + 1}: {evidence.gameTitle},
+                          potez {evidence.moveNumber}
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {selectedEvidence && (
+              <div className="player-priority-evidence">
+                <div>
+                  <span>
+                    Dokaz za prioritet {selectedEvidence.priority.rank}
+                  </span>
+                  <h3>{selectedEvidence.evidence.gameTitle}</h3>
+                  <p>
+                    Potez {selectedEvidence.evidence.moveNumber}: odigrano{" "}
+                    <strong>
+                      {selectedEvidence.evidence.playedMove.san}
+                    </strong>
+                    {selectedEvidence.evidence.bestMove && (
+                      <>
+                        , preporuka{" "}
+                        <strong>
+                          {selectedEvidence.evidence.bestMove.san}
+                        </strong>
+                      </>
+                    )}
+                    . Gubitak{" "}
+                    {formatNumber(
+                      selectedEvidence.evidence.centipawnLoss,
+                    )}{" "}
+                    cp.
+                  </p>
+                </div>
+                <div className="player-priority-board">
+                  <Chessboard
+                    position={selectedEvidence.evidence.beforeFen}
+                    boardOrientation={
+                      selectedEvidence.evidence.color === "black"
+                        ? "black"
+                        : "white"
+                    }
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvidence(null)}
+                >
+                  Zatvori dokaz
+                </button>
+              </div>
+            )}
           </section>
 
           {report.period.active && (

@@ -5,7 +5,13 @@ import {
   DOMAIN_STORAGE_KEY,
   importLegacyAdapterResult,
 } from "./repository.js";
+import { createLocalStorageMigrationBackupStore } from "./indexedDbStorage.js";
 import { sha256Hex } from "./stableHash.js";
+import {
+  DATA_AUTHORITY_STORAGE_KEY,
+  readDataAuthority,
+  writeDomainAuthority,
+} from "./dataAuthority.js";
 
 export const LEGACY_GAMES_STORAGE_KEY = "chesscare.savedGames";
 export const DOMAIN_BACKUP_KEY_PREFIX = "chesscare.domain.backup.v1";
@@ -32,22 +38,51 @@ function requireMigrationOptions(options) {
   }
 }
 
-function createSourceState(options) {
+async function createSourceState(options, repository) {
   const legacyStorageKey =
     options.legacyStorageKey || LEGACY_GAMES_STORAGE_KEY;
   const domainStorageKey = options.domainStorageKey || DOMAIN_STORAGE_KEY;
+
+  const domainStorageValue = options.storage.getItem(domainStorageKey);
+  const domainSnapshot = await repository.readSnapshot();
 
   return {
     legacyStorageKey,
     domainStorageKey,
     legacyStorageValue: options.storage.getItem(legacyStorageKey),
-    domainStorageValue: options.storage.getItem(domainStorageKey),
+    authorityStorageValue: options.storage.getItem(
+      DATA_AUTHORITY_STORAGE_KEY,
+    ),
+    dataAuthority: readDataAuthority(options.storage),
+    domainStorageValue,
+    domainSnapshot,
     legacyRecords: structuredClone(options.legacyRecords),
   };
 }
 
 async function createPreviewToken(sourceState) {
-  return `sha256:${await sha256Hex(JSON.stringify(sourceState))}`;
+  const comparableState = {
+    legacyStorageKey: sourceState.legacyStorageKey,
+    domainStorageKey: sourceState.domainStorageKey,
+    legacyStorageValue: sourceState.legacyStorageValue,
+    authorityStorageValue: sourceState.authorityStorageValue,
+    legacyRecords: sourceState.legacyRecords,
+    domainSnapshot: sourceState.domainSnapshot,
+  };
+  return `sha256:${await sha256Hex(JSON.stringify(comparableState))}`;
+}
+
+function resolveRepository(options) {
+  if (options.repository) return options.repository;
+  return createLocalStorageDomainRepository(options.storage, {
+    key: options.domainStorageKey || DOMAIN_STORAGE_KEY,
+  });
+}
+
+function resolveBackupStore(options) {
+  return (
+    options.backupStore || createLocalStorageMigrationBackupStore(options.storage)
+  );
 }
 
 function compactTimestamp(value) {
@@ -57,17 +92,18 @@ function compactTimestamp(value) {
 export async function createLegacyMigrationPreview(options) {
   requireMigrationOptions(options);
 
-  const sourceState = createSourceState(options);
-  const repository = createLocalStorageDomainRepository(options.storage, {
-    key: sourceState.domainStorageKey,
-  });
-  const currentSnapshot = await repository.readSnapshot();
+  const repository = resolveRepository(options);
+  const sourceState = await createSourceState(options, repository);
+  const currentSnapshot = sourceState.domainSnapshot;
   const adapted = await adaptLegacyGameRecords(options.legacyRecords, {
     now: options.now,
   });
   const simulation = createMemoryDomainRepository(currentSnapshot);
   const report = await importLegacyAdapterResult(simulation, adapted);
   const nextSnapshot = await simulation.readSnapshot();
+  const dataChanges = report.playersAdded > 0 || report.gamesAdded > 0;
+  const requiresAuthorityActivation =
+    sourceState.dataAuthority.authority !== "domain";
 
   return {
     token: await createPreviewToken(sourceState),
@@ -82,7 +118,9 @@ export async function createLegacyMigrationPreview(options) {
     possiblePlayerMatches: structuredClone(
       adapted.possiblePlayerMatches,
     ),
-    hasChanges: report.playersAdded > 0 || report.gamesAdded > 0,
+    dataChanges,
+    hasChanges: requiresAuthorityActivation,
+    requiresAuthorityActivation,
   };
 }
 
@@ -108,7 +146,7 @@ export async function executeLegacyMigration(options) {
     );
   }
 
-  if (!preview.hasChanges) {
+  if (!preview.hasChanges && !preview.requiresAuthorityActivation) {
     return {
       status: "no-changes",
       backupKey: null,
@@ -129,12 +167,15 @@ export async function executeLegacyMigration(options) {
     legacyStorageKey: preview.sourceState.legacyStorageKey,
     domainStorageKey: preview.sourceState.domainStorageKey,
     legacyStorageValue: preview.sourceState.legacyStorageValue,
+    authorityStorageKey: DATA_AUTHORITY_STORAGE_KEY,
+    authorityStorageValue: preview.sourceState.authorityStorageValue,
     domainStorageValue: preview.sourceState.domainStorageValue,
+    domainSnapshot: preview.sourceState.domainSnapshot,
     legacyRecords: preview.sourceState.legacyRecords,
   };
 
   try {
-    options.storage.setItem(backupKey, JSON.stringify(backup));
+    await resolveBackupStore(options).save(backupKey, backup);
   } catch (error) {
     throw new LegacyMigrationError(
       "backup-failed",
@@ -143,9 +184,7 @@ export async function executeLegacyMigration(options) {
     );
   }
 
-  const repository = createLocalStorageDomainRepository(options.storage, {
-    key: preview.sourceState.domainStorageKey,
-  });
+  const repository = resolveRepository(options);
 
   try {
     await repository.replaceSnapshot(preview.nextSnapshot);
@@ -157,9 +196,35 @@ export async function executeLegacyMigration(options) {
     );
   }
 
+  let authority;
+  try {
+    authority = writeDomainAuthority(options.storage, {
+      migratedAt: executedAt,
+      backupKey,
+      previewToken: preview.token,
+    });
+  } catch (error) {
+    try {
+      await repository.replaceSnapshot(preview.currentSnapshot);
+    } catch (rollbackError) {
+      throw new LegacyMigrationError(
+        "authority-write-and-rollback-failed",
+        "Domenski zapis je spremljen, ali aktivacija autoriteta i povrat prethodnog snapshota nisu uspjeli.",
+        { cause: new AggregateError([error, rollbackError]) },
+      );
+    }
+
+    throw new LegacyMigrationError(
+      "authority-write-failed",
+      "Aktivacija domenskog izvora nije uspjela; domenski snapshot vracen je na prethodno stanje.",
+      { cause: error },
+    );
+  }
+
   return {
     status: "migrated",
     backupKey,
+    authority,
     report: preview.report,
   };
 }

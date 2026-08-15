@@ -62,6 +62,7 @@ export async function createAnalysisJobPreview(options) {
       gameIds,
       engine: options.engine,
       settings: options.settings,
+      forceRefresh: options.forceRefresh,
       status: "queued",
       progress: { completed: 0, total: 0 },
     },
@@ -72,11 +73,13 @@ export async function createAnalysisJobPreview(options) {
     gameIds: validatedDraft.gameIds,
     engine: validatedDraft.engine,
     settings: validatedDraft.settings,
+    forceRefresh: validatedDraft.forceRefresh,
   });
   const request = {
     gameIds: validatedDraft.gameIds,
     engine: validatedDraft.engine,
     settings: validatedDraft.settings,
+    forceRefresh: validatedDraft.forceRefresh,
   };
   const token = await createToken(snapshot, request);
   const run = createAnalysisRun(
@@ -152,4 +155,3 @@ export async function confirmAnalysisJobCreation(options) {
     run: preview.run,
   };
 }
-

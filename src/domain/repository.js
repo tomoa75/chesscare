@@ -10,8 +10,13 @@ import {
   createTrainingAttempt,
   createTrainingTask,
 } from "./training.js";
+import {
+  createIndexedDbKeyValueStore,
+  DOMAIN_SNAPSHOTS_STORE,
+} from "./indexedDbStorage.js";
 
 export const DOMAIN_STORAGE_KEY = "chesscare.domain.v1";
+export const DOMAIN_STORAGE_CHANGED_EVENT = "chesscare:domain-storage-changed";
 
 const COLLECTIONS = Object.freeze({
   players: createPlayer,
@@ -267,8 +272,108 @@ export function createLocalStorageDomainRepository(
     },
     async (snapshot) => {
       safeStorage.setItem(key, JSON.stringify(snapshot));
+      if (
+        typeof window !== "undefined" &&
+        typeof window.dispatchEvent === "function" &&
+        typeof window.CustomEvent === "function"
+      ) {
+        window.dispatchEvent(
+          new window.CustomEvent(DOMAIN_STORAGE_CHANGED_EVENT, {
+            detail: { key },
+          }),
+        );
+      }
     },
   );
+}
+
+export function createIndexedDbDomainRepository(
+  indexedDBFactory,
+  options = {},
+) {
+  const key = options.key || DOMAIN_STORAGE_KEY;
+  const fallbackStorage = options.fallbackStorage;
+  const values = createIndexedDbKeyValueStore(
+    indexedDBFactory,
+    DOMAIN_SNAPSHOTS_STORE,
+    options,
+  );
+  let promotionPromise;
+
+  const removeFallbackSnapshot = () => {
+    if (typeof fallbackStorage?.removeItem === "function") {
+      fallbackStorage.removeItem(key);
+    }
+  };
+
+  const readIndexedDbSnapshot = async () => {
+    const stored = await values.get(key);
+    if (stored !== undefined) return stored;
+    if (!fallbackStorage || typeof fallbackStorage.getItem !== "function") {
+      return createEmptyDomainSnapshot();
+    }
+
+    promotionPromise ??= (async () => {
+      const serialized = fallbackStorage.getItem(key);
+      if (serialized === null) return createEmptyDomainSnapshot();
+
+      let snapshot;
+      try {
+        snapshot = validateDomainSnapshot(JSON.parse(serialized));
+      } catch (error) {
+        if (error instanceof DomainRepositoryError) throw error;
+        throw new DomainRepositoryError(
+          "invalid-json",
+          `Domenska pohrana '${key}' ne sadrzi valjani JSON.`,
+          { cause: error },
+        );
+      }
+
+      await values.put(key, snapshot);
+      removeFallbackSnapshot();
+      return snapshot;
+    })();
+
+    return promotionPromise;
+  };
+
+  return createRepository(
+    readIndexedDbSnapshot,
+    async (snapshot) => {
+      await values.put(key, snapshot);
+      removeFallbackSnapshot();
+      if (
+        typeof window !== "undefined" &&
+        typeof window.dispatchEvent === "function" &&
+        typeof window.CustomEvent === "function"
+      ) {
+        window.dispatchEvent(
+          new window.CustomEvent(DOMAIN_STORAGE_CHANGED_EVENT, {
+            detail: { key },
+          }),
+        );
+      }
+    },
+  );
+}
+
+const browserRepositories = new WeakMap();
+
+export function createBrowserDomainRepository(browserWindow = window) {
+  const existing = browserRepositories.get(browserWindow);
+  if (existing) return existing;
+
+  let repository;
+  if (browserWindow?.indexedDB) {
+    repository = createIndexedDbDomainRepository(browserWindow.indexedDB, {
+      fallbackStorage: browserWindow.localStorage,
+    });
+  } else {
+    repository = createLocalStorageDomainRepository(browserWindow.localStorage);
+  }
+
+  browserRepositories.set(browserWindow, repository);
+  return repository;
 }
 
 export async function importLegacyAdapterResult(repository, adapterResult) {

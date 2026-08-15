@@ -7,7 +7,8 @@ import {
   loadPlayerIdentityDashboard,
 } from "../domain/playerIdentityService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import "../playerIdentityDashboard.css";
@@ -43,9 +44,7 @@ export default function PlayerIdentityDashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const dashboard = await loadPlayerIdentityDashboard({ repository });
       setData(dashboard);
       setLoadError(null);
@@ -57,10 +56,17 @@ export default function PlayerIdentityDashboard() {
   useEffect(() => {
     void refresh();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void refresh();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void refresh();
     };
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    };
   }, [refresh]);
 
   const updateAliasForm = (field, value) => {
@@ -76,9 +82,7 @@ export default function PlayerIdentityDashboard() {
       status: "preparing",
     });
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const preview = await createAliasConfirmationPreview({
         repository,
         playerId: aliasForm.playerId,
@@ -108,9 +112,7 @@ export default function PlayerIdentityDashboard() {
       error: null,
     }));
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await confirmPlayerAlias({
         repository,
         playerId: preview.player.id,
@@ -154,9 +156,7 @@ export default function PlayerIdentityDashboard() {
       status: "preparing",
     });
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const preview = await createPlayerMergePreview({
         repository,
         sourcePlayerId: mergeForm.sourcePlayerId,
@@ -186,9 +186,7 @@ export default function PlayerIdentityDashboard() {
       error: null,
     }));
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await confirmPlayerMerge({
         repository,
         sourcePlayerId: preview.source.id,

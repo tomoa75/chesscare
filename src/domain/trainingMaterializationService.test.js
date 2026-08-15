@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   confirmTrainingMaterialization,
+  createAnalysisRun,
   createGame,
   createMemoryDomainRepository,
   createMoveAnalysis,
@@ -77,6 +78,66 @@ test("preview generira trening zadatak bez zapisivanja", async () => {
   assert.equal(preview.toAdd[0].source.moveAnalysisId, move.id);
   assert.equal(preview.toAdd[0].schedule.dueAt, NOW);
   assert.deepEqual(await repository.readSnapshot(), before);
+});
+
+test("preview uklanja ponovljene analize istog poteza i koristi najnoviju", async () => {
+  const { repository, player } = fixture();
+  const snapshot = await repository.readSnapshot();
+  const olderRun = createAnalysisRun(
+    {
+      id: "run-older",
+      gameIds: ["game-1"],
+      engine: { name: "Stockfish", version: "18" },
+      settings: { depth: 12, multiPv: 1, uciOptions: {} },
+      status: "completed",
+      progress: { completed: 1, total: 1 },
+      completedAt: "2026-07-25T12:00:00.000Z",
+    },
+    { now: "2026-07-25T12:00:00.000Z" },
+  );
+  const newerRun = createAnalysisRun(
+    {
+      id: "run-newer",
+      gameIds: ["game-1"],
+      engine: { name: "Stockfish", version: "18" },
+      settings: { depth: 14, multiPv: 1, uciOptions: {} },
+      status: "completed",
+      progress: { completed: 1, total: 1 },
+      completedAt: "2026-07-26T12:00:00.000Z",
+    },
+    { now: "2026-07-26T12:00:00.000Z" },
+  );
+  const baseMove = snapshot.moveAnalyses[0];
+  snapshot.analysisRuns = [olderRun, newerRun];
+  snapshot.moveAnalyses = [
+    createMoveAnalysis({
+      ...baseMove,
+      id: "move-older",
+      analysisRunId: olderRun.id,
+      centipawnLoss: 180,
+      classification: "mistake",
+    }),
+    createMoveAnalysis({
+      ...baseMove,
+      id: "move-newer",
+      analysisRunId: newerRun.id,
+      centipawnLoss: 120,
+      classification: "mistake",
+    }),
+  ];
+  await repository.replaceSnapshot(snapshot);
+
+  const preview = await createTrainingMaterializationPreview({
+    repository,
+    playerId: player.id,
+    minimumLoss: 50,
+    referenceTime: NOW,
+  });
+
+  assert.equal(preview.summary.analyzedMoves, 1);
+  assert.equal(preview.summary.eligibleMoves, 1);
+  assert.equal(preview.summary.toAdd, 1);
+  assert.equal(preview.toAdd[0].source.moveAnalysisId, "move-newer");
 });
 
 test("potvrda sprema cijeli preview i ponavljanje je idempotentno", async () => {

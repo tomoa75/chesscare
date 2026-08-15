@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   loadSavedGames,
   subscribeToSavedGames,
@@ -8,6 +8,10 @@ import {
   createLegacyMigrationPreview,
   executeLegacyMigration,
 } from "../domain/legacyMigrationService";
+import {
+  createBrowserMigrationBackupStore,
+} from "../domain/indexedDbStorage";
+import { createBrowserDomainRepository } from "../domain/repository";
 import "../domainDiagnostics.css";
 
 const LEGACY_METRICS = [
@@ -50,6 +54,14 @@ function MetricGrid({ metrics, values }) {
 }
 
 export default function DomainDiagnostics() {
+  const repository = useMemo(
+    () => createBrowserDomainRepository(window),
+    [],
+  );
+  const backupStore = useMemo(
+    () => createBrowserMigrationBackupStore(window),
+    [],
+  );
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -77,6 +89,7 @@ export default function DomainDiagnostics() {
         const data = await loadDomainDiagnostics({
           legacyRecords,
           storage: window.localStorage,
+          repository,
         });
 
         if (active) {
@@ -102,7 +115,7 @@ export default function DomainDiagnostics() {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [repository]);
 
   const prepareMigration = async () => {
     setMigration({
@@ -117,6 +130,7 @@ export default function DomainDiagnostics() {
       const preview = await createLegacyMigrationPreview({
         legacyRecords: loadSavedGames(),
         storage: window.localStorage,
+        repository,
       });
       setMigration({
         status: "preview",
@@ -147,11 +161,14 @@ export default function DomainDiagnostics() {
       const result = await executeLegacyMigration({
         legacyRecords: loadSavedGames(),
         storage: window.localStorage,
+        repository,
+        backupStore,
         previewToken: migration.preview.token,
       });
       const data = await loadDomainDiagnostics({
         legacyRecords: loadSavedGames(),
         storage: window.localStorage,
+        repository,
       });
 
       setState({ status: "ready", data, error: null });
@@ -202,6 +219,14 @@ export default function DomainDiagnostics() {
             Izvjestaj i migracijski preview samo citaju podatke. Migracija se
             nikada ne pokrece automatski i zahtijeva zasebnu potvrdu.
           </p>
+          <p role="status">
+            Autoritativni izvor: {" "}
+            <strong>
+              {data.dataAuthority.authority === "domain"
+                ? "novi domenski repository"
+                : "legacy zbirka"}
+            </strong>
+          </p>
         </div>
         <button
           type="button"
@@ -228,7 +253,7 @@ export default function DomainDiagnostics() {
           <div>
             <h2>Novi domenski snapshot</h2>
             <p>
-              Trenutni sadrzaj kljuca <code>{data.storageKey}</code>.
+              Trenutni snapshot u pohrani <code>{data.storageKind}</code>.
             </p>
           </div>
         </div>
@@ -273,8 +298,8 @@ export default function DomainDiagnostics() {
           }
         >
           {data.storageUsage.status === "indexeddb-recommended"
-            ? "Procijenjeni volumen dosegao je prag: preporucuje se prijelaz na IndexedDB prije daljnjeg rasta."
-            : "Procijenjeni volumen je ispod praga; localStorage je zasad prihvatljiv za ovu zbirku."}
+            ? "Legacy zbirka je velika, ali domenski snapshot i backup vise ne ovise o localStorage kvoti."
+            : "Domenski snapshot i backup koriste IndexedDB; localStorage zadrzava samo legacy zbirku."}
         </p>
       </section>
 
@@ -380,7 +405,8 @@ export default function DomainDiagnostics() {
             <strong>Migracija je zavrsena.</strong>
             {migration.result.backupKey && (
               <span>
-                Sigurnosna kopija: <code>{migration.result.backupKey}</code>
+                IndexedDB sigurnosna kopija:{" "}
+                <code>{migration.result.backupKey}</code>
               </span>
             )}
           </div>

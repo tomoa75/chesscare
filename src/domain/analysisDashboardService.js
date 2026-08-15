@@ -80,6 +80,7 @@ function resumeState(run, targetCount, warnings) {
 
 export async function deriveAnalysisTargets(options) {
   const { snapshot, gameIds, engine, settings } = options;
+  const forceRefresh = options.forceRefresh === true;
   const gamesById = new Map(snapshot.games.map((game) => [game.id, game]));
   const cachedKeys = new Set(
     snapshot.positionEvaluations.map((evaluation) => evaluation.cacheKey),
@@ -133,14 +134,15 @@ export async function deriveAnalysisTargets(options) {
       }),
     })),
   );
-  const cacheHits = targets.filter((target) =>
-    cachedKeys.has(target.cacheKey),
-  ).length;
+  const cacheHits = forceRefresh
+    ? 0
+    : targets.filter((target) => cachedKeys.has(target.cacheKey)).length;
   return {
     games,
     warnings,
     targets,
     cacheHits,
+    forceRefresh,
   };
 }
 
@@ -150,6 +152,7 @@ async function buildRunView(run, snapshot) {
     gameIds: run.gameIds,
     engine: run.engine,
     settings: run.settings,
+    forceRefresh: run.forceRefresh,
   });
   const resume = resumeState(
     run,
@@ -166,6 +169,7 @@ async function buildRunView(run, snapshot) {
       ...run.settings,
       uciOptions: { ...run.settings.uciOptions },
     },
+    forceRefresh: run.forceRefresh,
     progress: {
       ...run.progress,
       percent: progressPercent(run.progress, run.status),

@@ -1,10 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
-import PgnSaver from "./PgnSaver";
-import PgnLoader from "./PgnLoader";
+import PgnSaver from "./Pgnsaver";
+import PgnLoader from "./Pgnloader";
 import Potez from "../assets/Potez";
-import { loadSavedGames, saveSavedGames } from "../gameStorage";
+import {
+  isLegacyStorageWritable,
+  loadSavedGames,
+  saveSavedGames,
+} from "../gameStorage";
+import {
+  createDomainGameImportPreview,
+  executeDomainGameImport,
+  loadDomainImportCollection,
+  updateDomainGameRecord,
+} from "../domain/domainGameImportService";
+import {
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
+  DOMAIN_STORAGE_KEY,
+} from "../domain/repository";
 
 import "../import.css"; // Uvezi CSS datoteku za dodatne stilove
 
@@ -54,6 +70,11 @@ function createGameRecord(game, index) {
 }
 
 export default function ChessGame() {
+  const [searchParams] = useSearchParams();
+  const requestedGameId = searchParams.get("gameId") || "";
+  const openedRequestedGameIdRef = useRef("");
+  const usesDomainRepository = !isLegacyStorageWritable(window.localStorage);
+  const repository = useMemo(() => createBrowserDomainRepository(window), []);
   const [initialDraft] = useState(loadGameDraft);
   const [chess, setChess] = useState(() => createChessFromDraft(initialDraft));
   const [moveInput, setMoveInput] = useState(initialDraft?.moveInput || "");
@@ -71,7 +92,12 @@ export default function ChessGame() {
   const [boardOrientation, setBoardOrientation] = useState(
     initialDraft?.boardOrientation === "black" ? "black" : "white",
   );
-  const [savedGames, setSavedGames] = useState(() => loadSavedGames());
+  const [savedGames, setSavedGames] = useState(() =>
+    usesDomainRepository ? [] : loadSavedGames(),
+  );
+  const [collectionStatus, setCollectionStatus] = useState(
+    usesDomainRepository ? "loading" : "ready",
+  );
   const [hasUnsavedGames, setHasUnsavedGames] = useState(false);
   const [currentFileName, setCurrentFileName] = useState(
     initialDraft?.currentFileName || "partije.pgn",
@@ -96,9 +122,52 @@ export default function ChessGame() {
     [savedGames],
   );
 
+  const refreshDomainGames = useCallback(async () => {
+    const records = await loadDomainImportCollection({ repository });
+    setSavedGames(records);
+    setCollectionStatus("ready");
+    return records;
+  }, [repository]);
+
   useEffect(() => {
+    if (usesDomainRepository) return;
     saveSavedGames(savedGames);
-  }, [savedGames]);
+  }, [usesDomainRepository, savedGames]);
+
+  useEffect(() => {
+    if (!usesDomainRepository) return undefined;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const records = await loadDomainImportCollection({ repository });
+        if (active) {
+          setSavedGames(records);
+          setCollectionStatus("ready");
+        }
+      } catch (error) {
+        if (active) {
+          setCollectionStatus("error");
+          setMessage(`Biblioteka se ne moze ucitati: ${error.message}`);
+        }
+      }
+    };
+    const handleStorage = (event) => {
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      )
+        void refresh();
+    };
+
+    void refresh();
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    };
+  }, [repository, usesDomainRepository]);
 
   useEffect(() => {
     if (!hasUnsavedGames) return undefined;
@@ -109,7 +178,8 @@ export default function ChessGame() {
     };
 
     window.addEventListener("beforeunload", warnAboutUnsavedGames);
-    return () => window.removeEventListener("beforeunload", warnAboutUnsavedGames);
+    return () =>
+      window.removeEventListener("beforeunload", warnAboutUnsavedGames);
   }, [hasUnsavedGames]);
 
   useEffect(() => {
@@ -183,10 +253,49 @@ export default function ChessGame() {
     setCurrentMoveIndex(loadedGame.history().length - 1);
     setMessage("📂 Partija uspješno učitana iz datoteke!");
   };
-  const handleGamesLoaded = (loadedGames, loadedFileName) => {
+  const handleGamesLoaded = async (loadedGames, loadedFileName) => {
     const records = loadedGames.map((game, index) =>
       createGameRecord(game, index),
     );
+
+    if (usesDomainRepository) {
+      setCollectionStatus("saving");
+      try {
+        const request = {
+          records,
+          repository,
+          storage: window.localStorage,
+          sourceKind: "file",
+          sourceFileName: loadedFileName,
+        };
+        const preview = await createDomainGameImportPreview(request);
+        const result = await executeDomainGameImport({
+          ...request,
+          previewToken: preview.token,
+        });
+        const domainGames = await refreshDomainGames();
+        const selectedId = domainGames.some(
+          (game) => game.id === records[0]?.id,
+        )
+          ? records[0].id
+          : "";
+
+        if (typeof loadedFileName === "string" && loadedFileName.trim()) {
+          setCurrentFileName(loadedFileName);
+        }
+        handleGameLoaded(loadedGames[0], selectedId);
+        setHasUnsavedGames(false);
+        setMessage(
+          result.status === "imported"
+            ? `U domensku biblioteku dodano partija: ${result.report.gamesAdded}.`
+            : "Sve partije iz datoteke vec postoje u domenskoj biblioteci.",
+        );
+      } catch (error) {
+        setCollectionStatus("error");
+        setMessage(`Domenski import nije uspio: ${error.message}`);
+      }
+      return;
+    }
 
     setSavedGames(records);
     if (typeof loadedFileName === "string" && loadedFileName.trim()) {
@@ -197,7 +306,7 @@ export default function ChessGame() {
     setMessage(`Ucitano partija iz datoteke: ${records.length}`);
   };
 
-  const addCurrentGameToCollection = () => {
+  const addCurrentGameToCollection = async () => {
     const currentGame = getCurrentGameWithHeaders();
 
     if (currentGame.history().length === 0) {
@@ -206,14 +315,47 @@ export default function ChessGame() {
     }
 
     const record = createGameRecord(currentGame, savedGames.length);
+
+    if (usesDomainRepository) {
+      setCollectionStatus("saving");
+      try {
+        const request = {
+          records: [record],
+          repository,
+          storage: window.localStorage,
+          sourceKind: "manual",
+        };
+        const preview = await createDomainGameImportPreview(request);
+        const result = await executeDomainGameImport({
+          ...request,
+          previewToken: preview.token,
+        });
+        await refreshDomainGames();
+        if (result.status === "imported") {
+          setSelectedSavedGameId(record.id);
+          setPgn(currentGame.pgn());
+          setHasUnsavedGames(true);
+          setMessage("Partija je dodana u domensku biblioteku.");
+        } else {
+          setMessage("Jednaka partija vec postoji u domenskoj biblioteci.");
+        }
+      } catch (error) {
+        setCollectionStatus("error");
+        setMessage(`Spremanje partije nije uspjelo: ${error.message}`);
+      }
+      return;
+    }
+
     setSavedGames((games) => [...games, record]);
     setHasUnsavedGames(true);
     setSelectedSavedGameId(record.id);
     setPgn(currentGame.pgn());
-    setMessage(`Partija dodana u zajednicku datoteku (${savedGames.length + 1}).`);
+    setMessage(
+      `Partija dodana u zajednicku datoteku (${savedGames.length + 1}).`,
+    );
   };
 
-  const saveChangesToSelectedGame = () => {
+  const saveChangesToSelectedGame = async () => {
     if (!selectedSavedGameId) {
       setMessage("Najprije odaberi partiju koju zelis azurirati.");
       return;
@@ -223,6 +365,30 @@ export default function ChessGame() {
     const headers = updatedGame.header();
     const title = `${headers.Event || "Partija"}: ${headers.White || "Bijeli"} - ${headers.Black || "Crni"}`;
     const updatedPgn = updatedGame.pgn();
+
+    if (usesDomainRepository) {
+      setCollectionStatus("saving");
+      try {
+        await updateDomainGameRecord({
+          record: {
+            id: selectedSavedGameId,
+            title,
+            pgn: updatedPgn,
+          },
+          repository,
+          storage: window.localStorage,
+        });
+        await refreshDomainGames();
+        setChess(updatedGame);
+        setPgn(updatedPgn);
+        setHasUnsavedGames(true);
+        setMessage("Promjene su spremljene u domensku biblioteku.");
+      } catch (error) {
+        setCollectionStatus("error");
+        setMessage(error.message);
+      }
+      return;
+    }
 
     setSavedGames((games) =>
       games.map((game) =>
@@ -247,7 +413,39 @@ export default function ChessGame() {
     setMessage(`Otvorena partija: ${record.title}`);
   };
 
+  useEffect(() => {
+    if (
+      !requestedGameId ||
+      collectionStatus !== "ready" ||
+      openedRequestedGameIdRef.current === requestedGameId
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const record = savedGames.find((game) => game.id === requestedGameId);
+      if (!record) {
+        setMessage("Trazena partija vise nije dostupna u biblioteci.");
+        openedRequestedGameIdRef.current = requestedGameId;
+        return;
+      }
+
+      try {
+        const loadedGame = new Chess();
+        loadedGame.loadPgn(record.pgn);
+        handleGameLoaded(loadedGame, requestedGameId);
+        setMessage(`Otvorena partija: ${record.title}`);
+      } catch (error) {
+        setMessage(`Partija se ne moze otvoriti: ${error.message}`);
+      }
+      openedRequestedGameIdRef.current = requestedGameId;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [collectionStatus, requestedGameId, savedGames]);
+
   const removeSavedGame = (gameId) => {
+    if (usesDomainRepository) return;
     setSavedGames((games) => games.filter((game) => game.id !== gameId));
     setHasUnsavedGames(true);
     if (selectedSavedGameId === gameId) {
@@ -281,7 +479,9 @@ export default function ChessGame() {
       setCurrentFileName(file.name);
       const existingPgn = (await file.text()).trim();
       const writable = await fileHandle.createWritable();
-      await writable.write(existingPgn ? `${existingPgn}\n\n${currentPgn}\n` : `${currentPgn}\n`);
+      await writable.write(
+        existingPgn ? `${existingPgn}\n\n${currentPgn}\n` : `${currentPgn}\n`,
+      );
       await writable.close();
       setMessage(`Partija je dodana u datoteku: ${file.name}`);
     } catch (error) {
@@ -408,7 +608,7 @@ export default function ChessGame() {
 
   return (
     <div className="chess-container">
-      <h1>Chess.js React Demo</h1>
+      <h1>Unesite poteze i podatke o partiji</h1>
 
       <div className="chess-board">
         <Chessboard
@@ -596,6 +796,13 @@ export default function ChessGame() {
 
       <div className="chess-info">
         <h2>Partije u datoteci</h2>
+        {usesDomainRepository && (
+          <p className="unsaved-games-warning" role="status">
+            Domenska biblioteka je autoritativni izvor. Novi importi i sigurne
+            izmjene spremaju se izravno u repository; brisanje ce biti dostupno
+            kroz Biblioteku.
+          </p>
+        )}
         <p>
           Trenutno otvorena: <strong>{safeCurrentFileName}</strong>
         </p>
@@ -613,6 +820,8 @@ export default function ChessGame() {
           />
         </label>
         <p>Broj partija: {savedGames.length}</p>
+        {collectionStatus === "loading" && <p>Ucitavam biblioteku...</p>}
+        {collectionStatus === "saving" && <p>Spremam u biblioteku...</p>}
         {hasUnsavedGames && (
           <p className="unsaved-games-warning" role="alert">
             ⚠ Imate nespremljene promjene u zbirci partija. Odaberite
@@ -649,6 +858,7 @@ export default function ChessGame() {
                     type="button"
                     onClick={() => removeSavedGame(game.id)}
                     className="saved-game-remove"
+                    disabled={usesDomainRepository}
                   >
                     Ukloni
                   </button>
@@ -664,13 +874,17 @@ export default function ChessGame() {
           onGameLoad={handleGameLoaded}
           onGamesLoad={handleGamesLoaded}
         />
-        <button onClick={addCurrentGameToCollection} className="chess-button">
-          Dodaj partiju u datoteku
+        <button
+          onClick={addCurrentGameToCollection}
+          className="chess-button"
+          disabled={collectionStatus === "saving"}
+        >
+          Dodaj partiju u biblioteku
         </button>
         <button
           type="button"
           onClick={saveChangesToSelectedGame}
-          disabled={!selectedSavedGameId}
+          disabled={!selectedSavedGameId || collectionStatus === "saving"}
           className="chess-button"
           title="Ažurira odabranu partiju novim imenima i nazivom turnira"
         >
@@ -680,6 +894,7 @@ export default function ChessGame() {
           pgnText={getCurrentGameWithHeaders().pgn()}
           fileName={`${eventName || "partija"}.pgn`}
           buttonText="Spremi trenutnu partiju"
+          showSaveDialog
         />
         <button
           type="button"
@@ -693,7 +908,7 @@ export default function ChessGame() {
             pgnText={gamesPgn}
             fileName={safeCurrentFileName.trim() || "partije.pgn"}
             buttonText="Spremi sve partije"
-            askForFileName
+            showSaveDialog
             onSave={(savedFileName) => {
               setCurrentFileName(savedFileName);
               setHasUnsavedGames(false);

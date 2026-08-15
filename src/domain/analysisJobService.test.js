@@ -26,6 +26,7 @@ function analysisRun(id, options = {}) {
         multiPv: options.multiPv || 1,
         uciOptions: options.uciOptions || { Hash: 16 },
       },
+      forceRefresh: options.forceRefresh,
       status: "queued",
       progress: { completed: 0, total: 0 },
     },
@@ -183,6 +184,37 @@ test("ponovljeni posao koristi cache i ne pokrece engine", async () => {
   assert.equal(cachedClient.analysisCalls.length, 0);
 });
 
+test("svjeza analiza zanemaruje i prepisuje kompatibilni cache", async () => {
+  const repository = createMemoryDomainRepository();
+  const positions = [STANDARD_INITIAL_FEN, AFTER_E4_FEN];
+
+  await runPositionAnalysisJob({
+    repository,
+    stockfishClient: new FakeStockfishClient(),
+    run: analysisRun("refresh-prvi"),
+    positions,
+    now: () => NOW,
+  });
+
+  const refreshedClient = new FakeStockfishClient();
+  const refreshed = await runPositionAnalysisJob({
+    repository,
+    stockfishClient: refreshedClient,
+    run: analysisRun("refresh-drugi", { forceRefresh: true }),
+    positions,
+    now: () => NOW,
+  });
+
+  assert.equal(refreshed.cacheHits, 0);
+  assert.equal(refreshed.analyzed, 2);
+  assert.equal(refreshedClient.analysisCalls.length, 2);
+  assert.equal(
+    (await repository.listPositionEvaluations()).length,
+    2,
+    "isti cache kljucevi osvjezavaju zapise umjesto stvaranja duplikata",
+  );
+});
+
 test("promjena dubine ne koristi nekompatibilan cache", async () => {
   const repository = createMemoryDomainRepository();
   const firstClient = new FakeStockfishClient();
@@ -271,4 +303,3 @@ test("vec otkazan signal sprema cancelled status bez pokretanja enginea", async 
   assert.equal(client.initializeCalls.length, 0);
   assert.equal(client.analysisCalls.length, 0);
 });
-

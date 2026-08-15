@@ -5,6 +5,31 @@ nav a {
   font-weight: bold;
   text-decoration: none;
 }
+
+.nav-link {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-bottom: 3px solid transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.nav-link:hover {
+  background-color: #777474;
+}
+
+.nav-link--active {
+  color: #fff7c2;
+  background-color: #3f3e3e;
+  border-bottom-color: #f2cf45;
+}
+
+.nav-link:focus-visible {
+  outline: 3px solid #f2cf45;
+  outline-offset: 2px;
+}
+
 nav {
   display: flex;
   flex-wrap: wrap;

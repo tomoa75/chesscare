@@ -1,3 +1,10 @@
+import {
+  DATA_AUTHORITY_STORAGE_KEY,
+  isLegacyStorageWritable,
+} from "./domain/dataAuthority.js";
+
+export { isLegacyStorageWritable } from "./domain/dataAuthority.js";
+
 export const SAVED_GAMES_STORAGE_KEY = "chesscare.savedGames";
 export const SAVED_GAMES_CHANGED_EVENT = "chesscare:saved-games-changed";
 
@@ -15,6 +22,12 @@ export function loadSavedGames() {
 }
 
 export function saveSavedGames(games) {
+  if (!isLegacyStorageWritable(localStorage)) {
+    throw new Error(
+      `Legacy zbirka je read-only nakon aktivacije '${DATA_AUTHORITY_STORAGE_KEY}'.`,
+    );
+  }
+
   localStorage.setItem(SAVED_GAMES_STORAGE_KEY, JSON.stringify(games));
   window.dispatchEvent(new Event(SAVED_GAMES_CHANGED_EVENT));
 }

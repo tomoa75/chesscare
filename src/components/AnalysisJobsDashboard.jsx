@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { loadAnalysisJobsDashboard } from "../domain/analysisDashboardService";
 import {
   confirmAnalysisJobCreation,
   createAnalysisJobPreview,
 } from "../domain/analysisJobCreationService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import { createStockfishClient } from "../domain/stockfishService";
 import { executeStoredAnalysisJob } from "../domain/storedAnalysisExecutionService";
 import {
+  confirmAllCompletedPersonalizedMaterialization,
   confirmPersonalizedMaterialization,
+  createAllCompletedPersonalizedMaterializationPreview,
   createPersonalizedMaterializationPreview,
 } from "../domain/personalizedAnalysisMaterializationService";
 import "../analysisJobs.css";
@@ -34,6 +37,7 @@ const DEFAULT_SETTINGS = {
   uciOptions: { Hash: 16 },
 };
 const STOCKFISH_URL = `${import.meta.env.BASE_URL}stockfish/stockfish-18-lite-single.js`;
+const ALL_COMPLETED_RUNS = "all-completed-runs";
 
 function formatDate(value) {
   if (!value) return "Nije zabiljezeno";
@@ -45,6 +49,8 @@ function formatDate(value) {
 }
 
 export default function AnalysisJobsDashboard() {
+  const [searchParams] = useSearchParams();
+  const requestedGameId = searchParams.get("gameId") || "";
   const executionRef = useRef({ controller: null, client: null });
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({
@@ -52,8 +58,11 @@ export default function AnalysisJobsDashboard() {
     data: null,
     error: null,
   });
-  const [selectedGameIds, setSelectedGameIds] = useState([]);
+  const [selectedGameIds, setSelectedGameIds] = useState(() =>
+    requestedGameId ? [requestedGameId] : [],
+  );
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [creationConfirmed, setCreationConfirmed] = useState(false);
   const [creation, setCreation] = useState({
     status: "idle",
@@ -71,7 +80,7 @@ export default function AnalysisJobsDashboard() {
     error: null,
   });
   const [personalizationSelection, setPersonalizationSelection] = useState({
-    runId: "",
+    runId: ALL_COMPLETED_RUNS,
     playerId: "",
   });
   const [personalizationConfirmed, setPersonalizationConfirmed] =
@@ -94,9 +103,7 @@ export default function AnalysisJobsDashboard() {
       }));
 
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
+        const repository = createBrowserDomainRepository(window);
         const data = await loadAnalysisJobsDashboard({ repository });
 
         if (active) {
@@ -115,13 +122,18 @@ export default function AnalysisJobsDashboard() {
 
     void refresh();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void refresh();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void refresh();
     };
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
 
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     };
   }, [revision]);
 
@@ -170,14 +182,13 @@ export default function AnalysisJobsDashboard() {
     setCreationConfirmed(false);
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const preview = await createAnalysisJobPreview({
         repository,
         gameIds: selectedGameIds,
         engine: DEFAULT_ENGINE,
         settings,
+        forceRefresh,
       });
 
       setCreation({
@@ -206,14 +217,13 @@ export default function AnalysisJobsDashboard() {
     }));
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await confirmAnalysisJobCreation({
         repository,
         gameIds: selectedGameIds,
         engine: DEFAULT_ENGINE,
         settings,
+        forceRefresh,
         previewToken: creation.preview.token,
       });
 
@@ -257,9 +267,7 @@ export default function AnalysisJobsDashboard() {
     });
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await executeStoredAnalysisJob({
         repository,
         stockfishClient: client,
@@ -331,14 +339,18 @@ export default function AnalysisJobsDashboard() {
     setPersonalizationConfirmed(false);
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
-      const preview = await createPersonalizedMaterializationPreview({
-        repository,
-        runId: personalizationSelection.runId,
-        playerId: personalizationSelection.playerId,
-      });
+      const repository = createBrowserDomainRepository(window);
+      const preview =
+        personalizationSelection.runId === ALL_COMPLETED_RUNS
+          ? await createAllCompletedPersonalizedMaterializationPreview({
+              repository,
+              playerId: personalizationSelection.playerId,
+            })
+          : await createPersonalizedMaterializationPreview({
+              repository,
+              runId: personalizationSelection.runId,
+              playerId: personalizationSelection.playerId,
+            });
 
       setPersonalization({
         status: "preview",
@@ -366,15 +378,20 @@ export default function AnalysisJobsDashboard() {
     }));
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
-      const result = await confirmPersonalizedMaterialization({
-        repository,
-        runId: personalizationSelection.runId,
-        playerId: personalizationSelection.playerId,
-        previewToken: personalization.preview.token,
-      });
+      const repository = createBrowserDomainRepository(window);
+      const result =
+        personalizationSelection.runId === ALL_COMPLETED_RUNS
+          ? await confirmAllCompletedPersonalizedMaterialization({
+              repository,
+              playerId: personalizationSelection.playerId,
+              previewToken: personalization.preview.token,
+            })
+          : await confirmPersonalizedMaterialization({
+              repository,
+              runId: personalizationSelection.runId,
+              playerId: personalizationSelection.playerId,
+              previewToken: personalization.preview.token,
+            });
 
       setPersonalization({
         status: "success",
@@ -505,6 +522,19 @@ export default function AnalysisJobsDashboard() {
                   <option value="2">2</option>
                   <option value="3">3</option>
                 </select>
+              </label>
+              <label>
+                <span>Svjeza analiza</span>
+                <input
+                  type="checkbox"
+                  checked={forceRefresh}
+                  onChange={(event) => {
+                    setForceRefresh(event.target.checked);
+                    invalidatePreview();
+                  }}
+                  disabled={creation.status === "creating"}
+                />
+                <small>Zanemari kompatibilni cache i ponovno pokreni Stockfish.</small>
               </label>
               <button
                 type="button"
@@ -682,7 +712,9 @@ export default function AnalysisJobsDashboard() {
                 }
                 disabled={personalization.status === "saving"}
               >
-                <option value="">Odaberi posao</option>
+                <option value={ALL_COMPLETED_RUNS}>
+                  Sve zavrsene analize igraca
+                </option>
                 {data.jobs
                   .filter((job) => job.status === "completed")
                   .map((job) => (

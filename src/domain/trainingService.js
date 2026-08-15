@@ -47,6 +47,14 @@ function taskIdFor(move) {
   return `training-task-${move.id}`;
 }
 
+function movePositionKey(move) {
+  return `${move.playerId}:${move.gameId}:${move.ply}`;
+}
+
+function taskPositionKey(task) {
+  return `${task.playerId}:${task.source.gameId}:${task.source.ply}`;
+}
+
 export function generateTrainingTasks(options) {
   const {
     player,
@@ -88,11 +96,16 @@ export function generateTrainingTasks(options) {
   const existingSourceIds = new Set(
     existingTasks.map((task) => task.source.moveAnalysisId),
   );
+  const existingPositionKeys = new Set(existingTasks.map(taskPositionKey));
   const created = [];
   const skipped = [];
 
   for (const move of eligible) {
-    if (existingSourceIds.has(move.id)) {
+    const positionKey = movePositionKey(move);
+    if (
+      existingSourceIds.has(move.id) ||
+      existingPositionKeys.has(positionKey)
+    ) {
       skipped.push({
         moveAnalysisId: move.id,
         reason: "already-exists",

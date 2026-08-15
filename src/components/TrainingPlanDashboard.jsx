@@ -6,7 +6,8 @@ import {
   loadTrainingMaterializationDashboard,
 } from "../domain/trainingMaterializationService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import "../trainingPlanDashboard.css";
@@ -38,9 +39,7 @@ export default function TrainingPlanDashboard() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const data = await loadTrainingMaterializationDashboard({
         repository,
       });
@@ -54,10 +53,17 @@ export default function TrainingPlanDashboard() {
   useEffect(() => {
     void loadDashboard();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void loadDashboard();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void loadDashboard();
     };
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    };
   }, [loadDashboard]);
 
   const resetPreview = () => {
@@ -80,9 +86,7 @@ export default function TrainingPlanDashboard() {
     });
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const preview = await createTrainingMaterializationPreview({
         repository,
         playerId,
@@ -115,9 +119,7 @@ export default function TrainingPlanDashboard() {
     }));
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await confirmTrainingMaterialization({
         repository,
         playerId: preview.player.id,

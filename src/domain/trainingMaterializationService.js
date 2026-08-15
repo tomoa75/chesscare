@@ -1,6 +1,7 @@
 import { sha256Hex, stableStringify } from "./stableHash.js";
 import { generateTrainingTasks } from "./trainingService.js";
 import { getDueTrainingTasks } from "./trainingService.js";
+import { selectCurrentMoveAnalyses } from "./currentMoveAnalysisService.js";
 
 export class TrainingMaterializationError extends Error {
   constructor(code, message, options = {}) {
@@ -68,11 +69,15 @@ export async function loadTrainingMaterializationDashboard(options) {
     options.referenceTime || new Date().toISOString(),
   );
   const snapshot = await options.repository.readSnapshot();
+  const currentMoveAnalyses = selectCurrentMoveAnalyses(
+    snapshot.moveAnalyses,
+    snapshot.analysisRuns,
+  );
 
   return {
     players: snapshot.players
       .map((player) => {
-        const analyzedMoves = snapshot.moveAnalyses.filter(
+        const analyzedMoves = currentMoveAnalyses.filter(
           (move) => move.playerId === player.id,
         ).length;
         const tasks = snapshot.trainingTasks.filter(
@@ -119,7 +124,11 @@ export async function createTrainingMaterializationPreview(options) {
     );
   }
 
-  const playerMoves = snapshot.moveAnalyses.filter(
+  const currentMoveAnalyses = selectCurrentMoveAnalyses(
+    snapshot.moveAnalyses,
+    snapshot.analysisRuns,
+  );
+  const playerMoves = currentMoveAnalyses.filter(
     (move) => move.playerId === player.id,
   );
   const eligibleMoves = playerMoves.filter(
@@ -130,7 +139,7 @@ export async function createTrainingMaterializationPreview(options) {
   );
   const generated = generateTrainingTasks({
     player,
-    moveAnalyses: snapshot.moveAnalyses,
+    moveAnalyses: currentMoveAnalyses,
     games: snapshot.games,
     existingTasks: snapshot.trainingTasks,
     minimumLoss,

@@ -67,6 +67,7 @@ export async function executeStoredAnalysisJob(options) {
     gameIds: run.gameIds,
     engine: run.engine,
     settings: run.settings,
+    forceRefresh: run.forceRefresh,
   });
 
   activeRunIds.add(runId);
@@ -85,4 +86,3 @@ export async function executeStoredAnalysisJob(options) {
     activeRunIds.delete(runId);
   }
 }
-

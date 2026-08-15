@@ -1,5 +1,21 @@
 # Chesscare plan implementacije
 
+## MVP personalizirane analize - zavrsni opseg
+
+Kriterij zavrsetka: korisnik moze ucitati vise PGN partija, povezati ih s
+profilom, analizirati Stockfishem, spremiti rezultate, vidjeti ponavljajuce
+slabosti, dobiti tri prioriteta i otvoriti dokaznu poziciju za svaki zakljucak.
+
+- [x] Postojeci tok importa, migracije, profila, Stockfish poslova i spremanja
+  rezultata potvrden je domenskim i UI testovima.
+- [x] Definiran je minimalni read-only izlaz prioriteta: rang, konkretan opis,
+  velicina uzorka, prosjecni gubitak i dokazne pozicije s partijom, plyjem,
+  FEN-om te odigranim i preporucenim potezom.
+- [x] Domenski izvjestaj izvodi najvise tri prioriteta iz ponavljajucih slabosti.
+- [x] Personalizirani dashboard prikazuje prioritete i otvara dokaznu poziciju.
+- [x] MVP regresija potvrduje cijeli tok od vise partija do dokazivih prioriteta.
+- [x] Zavrsni testovi, lint i build prolaze.
+
 ## Pravila provedbe
 
 - Svaka faza mora zadržati postojeće ponašanje dok nije pokrivena testovima.

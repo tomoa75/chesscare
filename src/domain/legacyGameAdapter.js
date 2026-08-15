@@ -291,7 +291,7 @@ export async function adaptLegacyGameRecord(record, options = {}) {
       },
       result,
       source: {
-        kind: "migration",
+        kind: options.sourceKind || "migration",
         fileName: isNonEmptyString(options.sourceFileName)
           ? options.sourceFileName.trim()
           : null,

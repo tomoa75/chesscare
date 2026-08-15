@@ -40,7 +40,7 @@ function game(id, playerId, playedAt = null) {
   );
 }
 
-function run(id, gameId) {
+function run(id, gameId, completedAt = NOW) {
   return createAnalysisRun(
     {
       id,
@@ -49,7 +49,7 @@ function run(id, gameId) {
       settings: { depth: 12, multiPv: 1, uciOptions: {} },
       status: "completed",
       progress: { completed: 2, total: 2 },
-      completedAt: NOW,
+      completedAt,
     },
     { now: NOW },
   );
@@ -129,6 +129,9 @@ test("odabrani profil dobiva agregate i porijeklo samo svojih poteza", async () 
 
   assert.equal(dashboard.report.overall.sampleSize, 1);
   assert.equal(dashboard.report.overall.averageLoss, 100);
+  assert.equal(dashboard.report.byGame.length, 1);
+  assert.equal(dashboard.report.byGame[0].title, "Ana - Iva");
+  assert.equal(dashboard.report.byGame[0].accuracy, 100 * Math.exp(-100 / 220));
   assert.equal(dashboard.report.byOpening[0].key, "Open Game");
   assert.equal(dashboard.sources.length, 1);
   assert.deepEqual(dashboard.sources[0], {
@@ -203,4 +206,53 @@ test("dashboard prosljeduje vremenski raspon domenskom izvjestaju", async () => 
 
   assert.equal(dashboard.report.overall.sampleSize, 0);
   assert.equal(dashboard.report.period.excludedOutsideRangeMoves, 1);
+});
+
+test("profil koristi najnoviju zavrsenu generaciju istog poteza", async () => {
+  const ana = player("player-ana", "Ana");
+  const analyzedGame = game("game-refresh", ana.id);
+  const olderRun = run(
+    "run-older",
+    analyzedGame.id,
+    "2026-07-25T10:00:00.000Z",
+  );
+  const newerRun = run(
+    "run-newer",
+    analyzedGame.id,
+    "2026-07-26T10:00:00.000Z",
+  );
+  const repository = createMemoryDomainRepository({
+    schemaVersion: 1,
+    players: [ana],
+    games: [analyzedGame],
+    analysisRuns: [olderRun, newerRun],
+    moveAnalyses: [
+      move("move-older", ana.id, analyzedGame.id, olderRun.id, {
+        loss: 300,
+        classification: "blunder",
+      }),
+      move("move-newer", ana.id, analyzedGame.id, newerRun.id, {
+        loss: 60,
+        classification: "inaccuracy",
+      }),
+    ],
+    positionEvaluations: [],
+    trainingTasks: [],
+    trainingAttempts: [],
+  });
+
+  const dashboard = await loadPersonalizedDashboard({
+    repository,
+    playerId: ana.id,
+  });
+
+  assert.equal(dashboard.report.gamesAnalyzed, 1);
+  assert.equal(dashboard.report.overall.sampleSize, 1);
+  assert.equal(dashboard.report.overall.averageLoss, 60);
+  assert.equal(dashboard.report.overall.classifications.blunder, 0);
+  assert.equal(dashboard.report.overall.classifications.inaccuracy, 1);
+  assert.equal(dashboard.sources.length, 1);
+  assert.equal(dashboard.sources[0].runId, newerRun.id);
+  assert.equal(dashboard.summary.selectedMoveAnalyses, 1);
+  assert.equal(dashboard.summary.supersededMoveAnalyses, 1);
 });

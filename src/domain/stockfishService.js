@@ -34,9 +34,19 @@ export function scoreToWhitePerspective(score, fen) {
     throw new TypeError("UCI evaluacija nije valjana.");
   }
 
+  const sideToMove = sideToMoveFromFen(fen);
+  const value =
+    score.type === "mate" && score.value === 0
+      ? sideToMove === "w"
+        ? -1
+        : 1
+      : sideToMove === "w"
+        ? score.value
+        : -score.value;
+
   return {
     type: score.type,
-    value: sideToMoveFromFen(fen) === "w" ? score.value : -score.value,
+    value,
     perspective: "white",
   };
 }

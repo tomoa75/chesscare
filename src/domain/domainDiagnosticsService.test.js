@@ -58,6 +58,7 @@ test("dijagnostika cita legacy i domenske podatke bez pisanja", async () => {
   });
 
   assert.equal(diagnostics.generatedAt, NOW);
+  assert.equal(diagnostics.dataAuthority.authority, "legacy");
   assert.equal(diagnostics.legacy.recordsReceived, 3);
   assert.equal(diagnostics.legacy.gamesConverted, 2);
   assert.equal(diagnostics.legacy.gamesRejected, 1);

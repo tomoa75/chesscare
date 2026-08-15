@@ -122,6 +122,28 @@ test("mate score i bestmove parser zadrzavaju strukturirane vrijednosti", () => 
   assert.equal(parseUciBestMove("info depth 1"), null);
 });
 
+test("mate nula cuva pobjednicku perspektivu na matiranoj poziciji", () => {
+  const blackIsMated =
+    "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+  const whiteIsMated =
+    "8/8/8/8/8/6k1/6q1/7K w - - 0 1";
+
+  assert.deepEqual(
+    scoreToWhitePerspective(
+      { type: "mate", value: 0 },
+      blackIsMated,
+    ),
+    { type: "mate", value: 1, perspective: "white" },
+  );
+  assert.deepEqual(
+    scoreToWhitePerspective(
+      { type: "mate", value: 0 },
+      whiteIsMated,
+    ),
+    { type: "mate", value: -1, perspective: "white" },
+  );
+});
+
 test("UCI potezi i PV pretvaraju se u SAN bez rusenja na losem unosu", () => {
   assert.equal(uciMoveToSan(STANDARD_INITIAL_FEN, "e2e4"), "e4");
   assert.equal(uciMoveToSan(STANDARD_INITIAL_FEN, "nije-potez"), "nije-potez");

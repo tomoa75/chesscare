@@ -7,7 +7,8 @@ import {
   loadTrainingSession,
 } from "../domain/trainingSessionService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
 import "../personalizedTrainingSession.css";
@@ -39,9 +40,7 @@ export default function PersonalizedTrainingSession() {
 
   const load = async (selectedPlayerId = playerId) => {
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const data = await loadTrainingSession({
         repository,
         playerId: selectedPlayerId,
@@ -58,9 +57,7 @@ export default function PersonalizedTrainingSession() {
 
     const refresh = async () => {
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
+        const repository = createBrowserDomainRepository(window);
         const data = await loadTrainingSession({ repository, playerId });
         if (active) {
           setSession(data);
@@ -79,12 +76,17 @@ export default function PersonalizedTrainingSession() {
 
     void refresh();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void refresh();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void refresh();
     };
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     };
   }, [playerId]);
 
@@ -108,9 +110,7 @@ export default function PersonalizedTrainingSession() {
 
     const prepare = async () => {
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
+        const repository = createBrowserDomainRepository(window);
         const preview = await createTrainingAttemptPreview({
           repository,
           taskId: task.id,
@@ -142,9 +142,7 @@ export default function PersonalizedTrainingSession() {
     setAttempt((current) => ({ ...current, status: "saving", error: null }));
 
     try {
-      const repository = createLocalStorageDomainRepository(
-        window.localStorage,
-      );
+      const repository = createBrowserDomainRepository(window);
       const result = await confirmTrainingAttempt({
         repository,
         taskId: attempt.preview.task.id,
@@ -242,6 +240,10 @@ export default function PersonalizedTrainingSession() {
         <section className="training-session-state">
           <h2>Odaberi profil za trening</h2>
           <p>Dospjeli zadaci prikazat ce se prema prioritetu.</p>
+        </section>
+      ) : session.selectedPlayer?.id !== playerId ? (
+        <section className="training-session-state">
+          Ucitavam dospjele zadatke...
         </section>
       ) : !task ? (
         <section className="training-session-state">

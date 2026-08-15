@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  deleteDomainGame,
+  previewDomainGameDeletion,
+} from "../domain/gameLibraryActionService";
 import { loadDomainGameLibrary } from "../domain/gameLibraryService";
 import {
-  createLocalStorageDomainRepository,
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
   DOMAIN_STORAGE_KEY,
 } from "../domain/repository";
+import PgnSaver from "./Pgnsaver";
 import "../domainGameLibrary.css";
 
 const EMPTY_FILTERS = {
@@ -30,11 +36,30 @@ function PlayerName({ player }) {
   );
 }
 
+function pgnFileName(title) {
+  const safeTitle = title
+    .replace(/[<>:"/\\|?*]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${safeTitle || "partija"}.pgn`;
+}
+
 export default function DomainGameLibrary() {
+  const repository = useMemo(
+    () => createBrowserDomainRepository(window),
+    [],
+  );
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [state, setState] = useState({
     status: "loading",
     data: null,
+    error: null,
+  });
+  const [deletion, setDeletion] = useState({
+    status: "idle",
+    gameId: null,
+    preview: null,
+    confirmed: false,
     error: null,
   });
 
@@ -49,9 +74,6 @@ export default function DomainGameLibrary() {
       }));
 
       try {
-        const repository = createLocalStorageDomainRepository(
-          window.localStorage,
-        );
         const data = await loadDomainGameLibrary({ repository, filters });
 
         if (active) {
@@ -70,18 +92,84 @@ export default function DomainGameLibrary() {
 
     void loadLibrary();
     const handleStorage = (event) => {
-      if (event.key === DOMAIN_STORAGE_KEY) void loadLibrary();
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void loadLibrary();
     };
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
 
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
     };
-  }, [filters]);
+  }, [filters, repository]);
 
   const updateFilter = (name, value) => {
     setFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const openDeletionPreview = async (gameId) => {
+    setDeletion({
+      status: "loading",
+      gameId,
+      preview: null,
+      confirmed: false,
+      error: null,
+    });
+
+    try {
+      const preview = await previewDomainGameDeletion({ repository, gameId });
+      setDeletion({
+        status: "ready",
+        gameId,
+        preview,
+        confirmed: false,
+        error: null,
+      });
+    } catch (error) {
+      setDeletion({
+        status: "error",
+        gameId,
+        preview: null,
+        confirmed: false,
+        error: error.message,
+      });
+    }
+  };
+
+  const confirmDeletion = async () => {
+    const { gameId, preview, confirmed } = deletion;
+    if (!gameId || !preview?.canDelete || !confirmed) return;
+
+    setDeletion((current) => ({
+      ...current,
+      status: "deleting",
+      error: null,
+    }));
+    try {
+      await deleteDomainGame({
+        repository,
+        gameId,
+        confirmationToken: preview.confirmationToken,
+      });
+      setDeletion({
+        status: "idle",
+        gameId: null,
+        preview: null,
+        confirmed: false,
+        error: null,
+      });
+    } catch (error) {
+      setDeletion((current) => ({
+        ...current,
+        status: "error",
+        confirmed: false,
+        error: error.message,
+      }));
+    }
   };
 
   if (state.status === "loading" && !state.data) {
@@ -116,9 +204,8 @@ export default function DomainGameLibrary() {
           <span className="library-eyebrow">Novi repository</span>
           <h1>Biblioteka partija</h1>
           <p>
-            Read-only pregled migriranih partija i povezanih profila igraca.
-            Postojeci Import, Trening i Statistika i dalje koriste legacy
-            zbirku.
+            Sredisnje mjesto za pregled, izvoz, analizu i upravljanje
+            partijama spremljenima u novom domenskom repozitoriju.
           </p>
         </div>
         <div className="library-summary">
@@ -268,6 +355,111 @@ export default function DomainGameLibrary() {
                     <summary>Prikazi izvorni PGN</summary>
                     <pre>{game.rawPgn}</pre>
                   </details>
+
+                  <div className="library-actions" aria-label={`Akcije za ${game.title}`}>
+                    <Link to={`/import?gameId=${encodeURIComponent(game.id)}`}>
+                      Otvori u Importu
+                    </Link>
+                    <Link
+                      to={`/analysis-jobs?gameId=${encodeURIComponent(game.id)}`}
+                    >
+                      Pokreni analizu
+                    </Link>
+                    <Link
+                      to={`/position-analysis?gameId=${encodeURIComponent(game.id)}`}
+                    >
+                      Analiziraj poziciju
+                    </Link>
+                    <PgnSaver
+                      pgnText={game.rawPgn}
+                      fileName={pgnFileName(game.title)}
+                      buttonText="Izvezi PGN"
+                    />
+                    <button
+                      type="button"
+                      className="library-delete-button"
+                      onClick={() => void openDeletionPreview(game.id)}
+                    >
+                      Obrisi
+                    </button>
+                  </div>
+
+                  {deletion.gameId === game.id && (
+                    <section className="library-delete-preview" aria-live="polite">
+                      {deletion.status === "loading" && (
+                        <p>Provjeravam povezane podatke...</p>
+                      )}
+                      {deletion.error && <p className="library-delete-error">{deletion.error}</p>}
+                      {deletion.preview && (
+                        <>
+                          <h3>Utjecaj brisanja</h3>
+                          {deletion.preview.canDelete ? (
+                            <>
+                              <ul>
+                                <li>{deletion.preview.removals.games} partija</li>
+                                <li>{deletion.preview.removals.analysisRuns} analiza</li>
+                                <li>{deletion.preview.removals.moveAnalyses} rezultata poteza</li>
+                                <li>{deletion.preview.removals.trainingTasks} trening-zadataka</li>
+                                <li>{deletion.preview.removals.trainingAttempts} pokusaja treninga</li>
+                              </ul>
+                              <p>
+                                Cache evaluacija pozicija ostaje sacuvan jer se moze
+                                dijeliti s drugim partijama.
+                              </p>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={deletion.confirmed}
+                                  onChange={(event) =>
+                                    setDeletion((current) => ({
+                                      ...current,
+                                      confirmed: event.target.checked,
+                                    }))
+                                  }
+                                />
+                                Razumijem da se navedeni podaci trajno brisu.
+                              </label>
+                              <button
+                                type="button"
+                                className="library-confirm-delete"
+                                disabled={
+                                  !deletion.confirmed ||
+                                  deletion.status === "deleting"
+                                }
+                                onClick={() => void confirmDeletion()}
+                              >
+                                {deletion.status === "deleting"
+                                  ? "Brisem..."
+                                  : "Potvrdi brisanje"}
+                              </button>
+                            </>
+                          ) : (
+                            <p className="library-delete-error">
+                              Brisanje je blokirano: partija pripada analizi s vise
+                              partija ({deletion.preview.blockers
+                                .map((blocker) => blocker.analysisRunId)
+                                .join(", ")}).
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            className="library-cancel-delete"
+                            onClick={() =>
+                              setDeletion({
+                                status: "idle",
+                                gameId: null,
+                                preview: null,
+                                confirmed: false,
+                                error: null,
+                              })
+                            }
+                          >
+                            Odustani
+                          </button>
+                        </>
+                      )}
+                    </section>
+                  )}
                 </article>
               ))}
             </section>
@@ -277,4 +469,3 @@ export default function DomainGameLibrary() {
     </main>
   );
 }
-

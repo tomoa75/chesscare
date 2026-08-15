@@ -1,8 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
+import { useSearchParams } from "react-router-dom";
 import "../trening.css"; // Uvezi CSS datoteku za dodatne stilove
-import { loadSavedGames, subscribeToSavedGames } from "../gameStorage";
+import {
+  isLegacyStorageWritable,
+  loadSavedGames,
+  subscribeToSavedGames,
+} from "../gameStorage";
+import { loadDomainImportCollection } from "../domain/domainGameImportService";
+import {
+  createBrowserDomainRepository,
+  DOMAIN_STORAGE_CHANGED_EVENT,
+  DOMAIN_STORAGE_KEY,
+} from "../domain/repository";
 
 // Izbriši staru liniju i stavi ovu:
 const STOCKFISH_URL = `${import.meta.env.BASE_URL}stockfish/stockfish-18-lite-single.js`;
@@ -91,10 +102,20 @@ function parseAnalysisLine(line, fen) {
 }
 
 export default function Trening() {
+  const [searchParams] = useSearchParams();
+  const requestedGameId = searchParams.get("gameId") || "";
+  const usesDomainRepository = !isLegacyStorageWritable(window.localStorage);
+  const repository = useMemo(
+    () => createBrowserDomainRepository(window),
+    [],
+  );
   const engineRef = useRef(null);
   const fenRef = useRef("");
+  const openedRequestedGameIdRef = useRef("");
 
-  const [savedGames, setSavedGames] = useState(() => loadSavedGames());
+  const [savedGames, setSavedGames] = useState(() =>
+    usesDomainRepository ? [] : loadSavedGames(),
+  );
   const [selectedSavedGameId, setSelectedSavedGameId] = useState("");
   const [lines, setLines] = useState([
     { id: MAIN_LINE_ID, name: "Glavna linija", moves: [] },
@@ -152,7 +173,36 @@ export default function Trening() {
     fenRef.current = fen;
   }, [fen]);
 
-  useEffect(() => subscribeToSavedGames(setSavedGames), []);
+  useEffect(() => {
+    if (!usesDomainRepository) {
+      return subscribeToSavedGames(setSavedGames);
+    }
+
+    let active = true;
+    const refresh = async () => {
+      try {
+        const records = await loadDomainImportCollection({ repository });
+        if (active) setSavedGames(records);
+      } catch (error) {
+        console.error("Ne mogu ucitati domensku biblioteku za trening:", error);
+      }
+    };
+    const handleStorage = (event) => {
+      if (
+        event.key === DOMAIN_STORAGE_KEY ||
+        event.detail?.key === DOMAIN_STORAGE_KEY
+      ) void refresh();
+    };
+
+    void refresh();
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(DOMAIN_STORAGE_CHANGED_EVENT, handleStorage);
+    };
+  }, [repository, usesDomainRepository]);
 
   useEffect(() => {
     let engine;
@@ -248,7 +298,7 @@ export default function Trening() {
     };
   }, [engineReady, fen, igraJeGotova]);
 
-  function loadGameForTraining(gameId) {
+  const loadGameForTraining = useCallback((gameId) => {
     const record = savedGames.find((game) => game.id === gameId);
     if (!record) return;
 
@@ -271,7 +321,20 @@ export default function Trening() {
     } catch (error) {
       console.error("Ne mogu ucitati partiju u trening:", error);
     }
-  }
+  }, [savedGames]);
+
+  useEffect(() => {
+    if (
+      !requestedGameId ||
+      openedRequestedGameIdRef.current === requestedGameId ||
+      !savedGames.some((game) => game.id === requestedGameId)
+    ) {
+      return;
+    }
+
+    loadGameForTraining(requestedGameId);
+    openedRequestedGameIdRef.current = requestedGameId;
+  }, [loadGameForTraining, requestedGameId, savedGames]);
 
   function onDrop(sourceSquare, targetSquare) {
     try {

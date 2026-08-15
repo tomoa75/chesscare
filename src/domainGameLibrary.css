@@ -222,6 +222,97 @@
   border-radius: 8px;
 }
 
+.library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #334155;
+}
+
+.library-actions a,
+.library-actions button {
+  min-height: 40px;
+  padding: 9px 13px !important;
+  color: #e2e8f0 !important;
+  background: #1e293b !important;
+  border: 1px solid #475569 !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700 !important;
+  text-decoration: none;
+}
+
+.library-actions a:hover,
+.library-actions button:hover {
+  border-color: #86efac !important;
+}
+
+.library-actions .library-delete-button {
+  margin-left: auto;
+  color: #fecaca !important;
+  border-color: #7f1d1d !important;
+}
+
+.library-delete-preview {
+  margin-top: 12px;
+  padding: 16px;
+  background: #1c1917;
+  border: 1px solid #78350f;
+  border-radius: 9px;
+}
+
+.library-delete-preview h3,
+.library-delete-preview p {
+  margin-top: 0;
+}
+
+.library-delete-preview ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 22px;
+  padding-left: 20px;
+  color: #d6d3d1;
+}
+
+.library-delete-preview label {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 14px 0;
+}
+
+.library-delete-preview button {
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.library-confirm-delete {
+  color: #fff;
+  background: #b91c1c;
+}
+
+.library-confirm-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.library-cancel-delete {
+  margin-left: 9px;
+  color: #e2e8f0;
+  background: #475569;
+}
+
+.library-delete-error {
+  color: #fecaca;
+}
+
 .library-state {
   padding: 38px;
   text-align: center;
@@ -290,4 +381,3 @@
     text-align: left;
   }
 }
-

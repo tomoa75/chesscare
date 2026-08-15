@@ -100,6 +100,7 @@ export function createAnalysisRun(input, options = {}) {
     gameIds: [...new Set(input.gameIds.map((id) => requireString(id, "ID partije")))],
     engine: createEngine(input.engine),
     settings: createAnalysisSettings(input.settings),
+    forceRefresh: input?.forceRefresh === true,
     status,
     progress,
     createdAt,

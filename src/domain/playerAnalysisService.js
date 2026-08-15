@@ -10,8 +10,15 @@ import { playerMatchesAlias } from "./player.js";
 import { uciMoveToSan } from "./stockfishService.js";
 
 const CLASSIFICATIONS = ["good", "inaccuracy", "mistake", "blunder"];
+const WEAK_CLASSIFICATIONS = ["inaccuracy", "mistake", "blunder"];
+const CLASSIFICATION_PRIORITY = {
+  inaccuracy: 1,
+  mistake: 2,
+  blunder: 3,
+};
 const MATERIAL_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 const MATE_BASE_SCORE = 100000;
+const MAX_MATE_RELATED_CENTIPAWN_LOSS = 300;
 
 function meaningfulName(value) {
   return typeof value === "string" && value.trim() && value.trim() !== "?";
@@ -220,11 +227,53 @@ export function classifyCentipawnLoss(loss) {
   return "good";
 }
 
-function centipawnLoss(beforeScore, afterScore, color) {
+export function calculateCentipawnLoss(beforeScore, afterScore, color) {
   const multiplier = color === "white" ? 1 : -1;
   const before = numericEvaluation(beforeScore) * multiplier;
   const after = numericEvaluation(afterScore) * multiplier;
-  return Math.max(0, before - after);
+  const loss = Math.max(0, before - after);
+
+  if (beforeScore.type === "mate" || afterScore.type === "mate") {
+    return Math.min(loss, MAX_MATE_RELATED_CENTIPAWN_LOSS);
+  }
+
+  return loss;
+}
+
+function sameUciMove(left, right) {
+  return (
+    typeof left === "string" &&
+    typeof right === "string" &&
+    left.trim().toLowerCase() === right.trim().toLowerCase()
+  );
+}
+
+function normalizeMoveAnalysis(move) {
+  const playedBestMove = sameUciMove(
+    move.playedMove?.uci,
+    move.bestMove?.uci,
+  );
+  const mateRelated =
+    move.beforeEvaluation?.type === "mate" ||
+    move.afterEvaluation?.type === "mate";
+
+  if (!playedBestMove && !mateRelated) {
+    return move;
+  }
+
+  const centipawnLoss = playedBestMove
+    ? 0
+    : calculateCentipawnLoss(
+        move.beforeEvaluation,
+        move.afterEvaluation,
+        move.color,
+      );
+
+  return {
+    ...move,
+    centipawnLoss,
+    classification: classifyCentipawnLoss(centipawnLoss),
+  };
 }
 
 function mainLine(evaluation) {
@@ -287,12 +336,14 @@ export async function buildPersonalizedMoveAnalyses(options) {
 
     const beforeLine = mainLine(beforeEvaluation);
     const afterLine = mainLine(afterEvaluation);
-    const loss = centipawnLoss(
-      beforeLine.score,
-      afterLine.score,
-      context.color,
-    );
     const bestMoveUci = beforeLine.bestMove;
+    const loss = sameUciMove(context.playedMove.uci, bestMoveUci)
+      ? 0
+      : calculateCentipawnLoss(
+          beforeLine.score,
+          afterLine.score,
+          context.color,
+        );
 
     moveAnalyses.push(
       createMoveAnalysis({
@@ -367,6 +418,102 @@ function groupMoves(moves, keys, selector) {
   }));
 }
 
+function priorityEvidence(move, gamesById) {
+  const game = gamesById.get(move.gameId);
+
+  return {
+    moveAnalysisId: move.id,
+    gameId: move.gameId,
+    gameTitle: game?.title || move.gameId,
+    gameFound: Boolean(game),
+    ply: move.ply,
+    moveNumber: Math.ceil(move.ply / 2),
+    color: move.color,
+    phase: move.phase,
+    beforeFen: move.beforeFen,
+    playedMove: { ...move.playedMove },
+    bestMove: move.bestMove ? { ...move.bestMove } : null,
+    centipawnLoss: move.centipawnLoss,
+    classification: move.classification,
+  };
+}
+
+function buildImprovementPriorities(
+  moves,
+  gamesById,
+  openingByGame,
+) {
+  const weakMoves = moves.filter((move) =>
+    WEAK_CLASSIFICATIONS.includes(move.classification),
+  );
+  const dimensions = [
+    ["phase", (move) => move.phase],
+    [
+      "opening",
+      (move) => openingByGame.get(move.gameId) || "Unknown opening",
+    ],
+    ["color", (move) => move.color],
+  ];
+  const candidates = [];
+
+  for (const [dimension, keyForMove] of dimensions) {
+    const grouped = new Map();
+
+    for (const move of weakMoves) {
+      const key = keyForMove(move);
+      const groupKey = `${key}:${move.classification}`;
+      const group = grouped.get(groupKey) || {
+        dimension,
+        key,
+        classification: move.classification,
+        moves: [],
+      };
+      group.moves.push(move);
+      grouped.set(groupKey, group);
+    }
+
+    for (const group of grouped.values()) {
+      const summary = summarizeMoves(group.moves);
+      const recurring = summary.sampleSize >= 2;
+      candidates.push({
+        id: `${group.dimension}:${group.key}:${group.classification}`,
+        dimension: group.dimension,
+        key: group.key,
+        classification: group.classification,
+        occurrences: summary.sampleSize,
+        gameCount: summary.gameCount,
+        averageLoss: summary.averageLoss,
+        recurring,
+        priorityScore:
+          (recurring ? 100000 : 0) +
+          CLASSIFICATION_PRIORITY[group.classification] * 10000 +
+          summary.sampleSize * 100 +
+          summary.averageLoss,
+        evidence: [...group.moves]
+          .sort(
+            (left, right) =>
+              right.centipawnLoss - left.centipawnLoss ||
+              left.id.localeCompare(right.id),
+          )
+          .slice(0, 3)
+          .map((move) => priorityEvidence(move, gamesById)),
+      });
+    }
+  }
+
+  return candidates
+    .sort(
+      (left, right) =>
+        right.priorityScore - left.priorityScore ||
+        left.id.localeCompare(right.id),
+    )
+    .slice(0, 3)
+    .map((priority, index) => ({
+      ...priority,
+      rank: index + 1,
+    }));
+}
+
 export function parsePgnPlayedDate(value) {
   if (typeof value !== "string") return null;
   const match = value.trim().match(/^(\d{4})[.-](\d{2})[.-](\d{2})$/);
@@ -413,9 +560,9 @@ export function buildPersonalizedPlayerReport(options) {
   }
 
   const period = reportPeriod(options.period);
-  const allPlayerMoves = moveAnalyses.filter(
-    (move) => move.playerId === player.id,
-  );
+  const allPlayerMoves = moveAnalyses
+    .filter((move) => move.playerId === player.id)
+    .map(normalizeMoveAnalysis);
   const gamesById = new Map(games.map((game) => [game.id, game]));
   const playedDateByGame = new Map(
     games.map((game) => [
@@ -474,6 +621,7 @@ export function buildPersonalizedPlayerReport(options) {
   const undatedMoves = allPlayerMoves.filter(
     (move) => !playedDateByGame.get(move.gameId),
   ).length;
+  const gameKeys = [...new Set(playerMoves.map((move) => move.gameId))];
 
   return {
     player: {
@@ -486,6 +634,25 @@ export function buildPersonalizedPlayerReport(options) {
         .filter((gameId) => gamesById.has(gameId)),
     ).size,
     overall: summarizeMoves(playerMoves),
+    byGame: gameKeys
+      .map((gameId) => {
+        const game = gamesById.get(gameId);
+        return {
+          gameId,
+          title: game?.title || gameId,
+          date: playedDateByGame.get(gameId),
+          result: game?.result || "*",
+          gameFound: Boolean(game),
+          ...summarizeMoves(
+            playerMoves.filter((move) => move.gameId === gameId),
+          ),
+        };
+      })
+      .sort(
+        (left, right) =>
+          (right.date || "").localeCompare(left.date || "") ||
+          left.title.localeCompare(right.title),
+      ),
     byColor: groupMoves(playerMoves, ["white", "black"], (move) => move.color),
     byPhase,
     byResult: groupMoves(
@@ -506,6 +673,11 @@ export function buildPersonalizedPlayerReport(options) {
       playerMoves,
       periodKeys,
       (move) => playedDateByGame.get(move.gameId)?.slice(0, 4) || "unknown",
+    ),
+    priorities: buildImprovementPriorities(
+      playerMoves,
+      gamesById,
+      openingByGame,
     ),
     period: {
       from: period.from,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildPersonalizedMoveAnalyses,
   buildPersonalizedPlayerReport,
+  calculateCentipawnLoss,
   classifyCentipawnLoss,
   createGame,
   createMoveAnalysis,
@@ -236,7 +237,7 @@ test("centipawn gubitak za crnog ispravno okrece bijelu perspektivu", async () =
   });
   const context = extractPlayerMoveContexts([game], ana).contexts[0];
   const evaluations = [
-    await cachedEvaluation(context.beforeFen, -40, "e7e5"),
+    await cachedEvaluation(context.beforeFen, -40, "e7e6"),
     await cachedEvaluation(context.afterFen, 110),
   ];
   const built = await buildPersonalizedMoveAnalyses({
@@ -252,9 +253,149 @@ test("centipawn gubitak za crnog ispravno okrece bijelu perspektivu", async () =
   assert.equal(built.moveAnalyses[0].centipawnLoss, 150);
   assert.equal(built.moveAnalyses[0].classification, "mistake");
   assert.deepEqual(built.moveAnalyses[0].bestMove, {
+    san: "e6",
+    uci: "e7e6",
+  });
+});
+
+test("odigrani Stockfishov najbolji potez uvijek ima nula cp gubitka", async () => {
+  const ana = profile();
+  const game = domainGame({
+    id: "best-move-analysis",
+    white: "Marko",
+    black: "Ana Saric",
+    moves: "1. e4 e5 1-0",
+    blackPlayerId: ana.id,
+  });
+  const context = extractPlayerMoveContexts([game], ana).contexts[0];
+  const evaluations = [
+    await cachedEvaluation(context.beforeFen, -40, "e7e5"),
+    await cachedEvaluation(context.afterFen, 110),
+  ];
+  const built = await buildPersonalizedMoveAnalyses({
+    games: [game],
+    player: ana,
+    positionEvaluations: evaluations,
+    engine: ENGINE,
+    settings: SETTINGS,
+    analysisRunId: "analysis-run-best-move",
+  });
+
+  assert.deepEqual(built.moveAnalyses[0].playedMove, {
     san: "e5",
     uci: "e7e5",
   });
+  assert.deepEqual(built.moveAnalyses[0].bestMove, {
+    san: "e5",
+    uci: "e7e5",
+  });
+  assert.equal(built.moveAnalyses[0].centipawnLoss, 0);
+  assert.equal(built.moveAnalyses[0].classification, "good");
+});
+
+test("izvjestaj ispravlja ranije spremljenu pogresku za najbolji potez", () => {
+  const ana = profile();
+  const game = domainGame({
+    id: "legacy-best-move",
+    white: "Marko",
+    black: "Ana Saric",
+    moves: "1. e4 e5 1-0",
+    blackPlayerId: ana.id,
+  });
+  const legacyMove = createMoveAnalysis({
+    id: "legacy-best-move-analysis",
+    analysisRunId: "legacy-best-run",
+    gameId: game.id,
+    playerId: ana.id,
+    ply: 2,
+    color: "black",
+    phase: "opening",
+    beforeFen: "before",
+    afterFen: "after",
+    playedMove: { san: "e5", uci: "e7e5" },
+    bestMove: { san: "e5", uci: "e7e5" },
+    beforeEvaluation: { type: "cp", value: -40 },
+    afterEvaluation: { type: "cp", value: 110 },
+    centipawnLoss: 150,
+    classification: "mistake",
+  });
+
+  const report = buildPersonalizedPlayerReport({
+    player: ana,
+    moveAnalyses: [legacyMove],
+    games: [game],
+  });
+
+  assert.equal(report.overall.totalLoss, 0);
+  assert.equal(report.overall.classifications.good, 1);
+  assert.equal(report.overall.classifications.mistake, 0);
+  assert.deepEqual(report.priorities, []);
+});
+
+test("mate evaluacija ne postaje lazni gubitak od gotovo 100000 cp", () => {
+  assert.equal(
+    calculateCentipawnLoss(
+      { type: "cp", value: 25, perspective: "white" },
+      { type: "mate", value: -3, perspective: "white" },
+      "white",
+    ),
+    300,
+  );
+  assert.equal(
+    calculateCentipawnLoss(
+      { type: "mate", value: 3, perspective: "white" },
+      { type: "mate", value: 5, perspective: "white" },
+      "white",
+    ),
+    2,
+  );
+  assert.equal(
+    calculateCentipawnLoss(
+      { type: "cp", value: -40, perspective: "white" },
+      { type: "mate", value: 2, perspective: "white" },
+      "black",
+    ),
+    300,
+  );
+});
+
+test("izvjestaj normalizira ranije spremljeni previsoki mate gubitak", () => {
+  const ana = profile();
+  const game = domainGame({
+    id: "legacy-mate-loss",
+    white: "Ana Saric",
+    black: "Iva",
+    moves: "1. e4 e5 1-0",
+    whitePlayerId: ana.id,
+  });
+  const legacyMove = createMoveAnalysis({
+    id: "legacy-mate-move",
+    analysisRunId: "legacy-run",
+    gameId: game.id,
+    playerId: ana.id,
+    ply: 1,
+    color: "white",
+    phase: "opening",
+    beforeFen: "before",
+    afterFen: "after",
+    playedMove: { san: "e4", uci: "e2e4" },
+    bestMove: null,
+    beforeEvaluation: { type: "cp", value: 25 },
+    afterEvaluation: { type: "mate", value: -3 },
+    centipawnLoss: 100022,
+    classification: "blunder",
+  });
+
+  const report = buildPersonalizedPlayerReport({
+    player: ana,
+    moveAnalyses: [legacyMove],
+    games: [game],
+  });
+
+  assert.equal(report.overall.totalLoss, 300);
+  assert.equal(report.overall.averageLoss, 300);
+  assert.equal(report.overall.classifications.blunder, 1);
+  assert.equal(report.priorities[0].evidence[0].centipawnLoss, 300);
 });
 
 test("nedostajuci cache daje upozorenje umjesto nepotpunog rezultata", async () => {
@@ -394,6 +535,84 @@ test("izvjestaj iskljucuje protivnika i grupira uz velicinu uzorka", () => {
       ["Queen's Gambit", 1],
     ],
   );
+});
+
+test("izvjestaj rangira tri ponavljajuce slabosti i cuva dokazne pozicije", () => {
+  const ana = profile();
+  const games = [
+    domainGame({
+      id: "priority-1",
+      white: "Ana Saric",
+      black: "Iva",
+      moves: "1. e4 e5 1-0",
+      opening: "Italian Game",
+      whitePlayerId: ana.id,
+    }),
+    domainGame({
+      id: "priority-2",
+      white: "Ana Saric",
+      black: "Marko",
+      moves: "1. e4 e5 1-0",
+      opening: "Italian Game",
+      whitePlayerId: ana.id,
+    }),
+  ];
+  const moves = [
+    analyzedMove({
+      id: "priority-move-1",
+      gameId: "priority-1",
+      color: "white",
+      phase: "opening",
+      loss: 140,
+    }),
+    analyzedMove({
+      id: "priority-move-2",
+      gameId: "priority-2",
+      color: "white",
+      phase: "opening",
+      loss: 120,
+    }),
+  ];
+  const report = buildPersonalizedPlayerReport({
+    player: ana,
+    moveAnalyses: moves,
+    games,
+  });
+
+  assert.equal(report.priorities.length, 3);
+  assert.deepEqual(
+    report.priorities.map((priority) => priority.dimension).sort(),
+    ["color", "opening", "phase"],
+  );
+  assert.deepEqual(
+    report.priorities.map((priority) => priority.rank),
+    [1, 2, 3],
+  );
+  assert.equal(
+    report.priorities.every(
+      (priority) =>
+        priority.recurring &&
+        priority.occurrences === 2 &&
+        priority.gameCount === 2 &&
+        priority.evidence.length === 2,
+    ),
+    true,
+  );
+  assert.deepEqual(report.priorities[0].evidence[0], {
+    moveAnalysisId: "priority-move-1",
+    gameId: "priority-1",
+    gameTitle: "Ana Saric - Iva",
+    gameFound: true,
+    ply: 1,
+    moveNumber: 1,
+    color: "white",
+    phase: "opening",
+    beforeFen: "before",
+    playedMove: { san: "e4", uci: "e2e4" },
+    bestMove: null,
+    centipawnLoss: 140,
+    classification: "mistake",
+  });
 });
 
 test("izvjestaj grupira po godini i vremenski filter ne nagada nepotpune datume", () => {

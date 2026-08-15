@@ -7,6 +7,7 @@ import {
   DOMAIN_STORAGE_KEY,
 } from "./repository.js";
 import { LEGACY_GAMES_STORAGE_KEY } from "./legacyMigrationService.js";
+import { readDataAuthority } from "./dataAuthority.js";
 
 export const DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES = 4 * 1024 * 1024;
 
@@ -33,9 +34,10 @@ export function createStorageUsageReport(storage, options = {}) {
     throw new TypeError("Prag upozorenja mora biti pozitivan broj bajtova.");
   }
 
-  const domainBytes = estimateStorageStringBytes(
-    storage.getItem(domainStorageKey),
-  );
+  const domainValue = Object.hasOwn(options, "domainStorageValue")
+    ? options.domainStorageValue
+    : storage.getItem(domainStorageKey);
+  const domainBytes = estimateStorageStringBytes(domainValue);
   const legacyBytes = estimateStorageStringBytes(
     storage.getItem(legacyStorageKey),
   );
@@ -61,12 +63,15 @@ export async function loadDomainDiagnostics(options) {
   const adapted = await adaptLegacyGameRecords(options.legacyRecords, {
     now: options.now,
   });
-  const repository = createLocalStorageDomainRepository(options.storage);
+  const repository =
+    options.repository || createLocalStorageDomainRepository(options.storage);
   const snapshot = await repository.readSnapshot();
 
   return {
     generatedAt: options.now || new Date().toISOString(),
     storageKey: DOMAIN_STORAGE_KEY,
+    storageKind: options.repository ? "IndexedDB" : "localStorage",
+    dataAuthority: readDataAuthority(options.storage),
     legacy: createReadOnlyAdapterReport(adapted),
     domain: {
       players: snapshot.players.length,
@@ -79,6 +84,9 @@ export async function loadDomainDiagnostics(options) {
     },
     storageUsage: createStorageUsageReport(options.storage, {
       warningThresholdBytes: options.storageWarningThresholdBytes,
+      domainStorageValue: options.repository
+        ? JSON.stringify(snapshot)
+        : options.storage.getItem(DOMAIN_STORAGE_KEY),
     }),
     duplicateGroups: adapted.duplicateGroups,
     possiblePlayerMatches: adapted.possiblePlayerMatches,

@@ -10,9 +10,10 @@ function PgnSaver({
   fileName = "partija.pgn",
   buttonText = "Spremi PGN datoteku",
   askForFileName = false,
+  showSaveDialog = false,
   onSave,
 }) {
-  const handleSavePgn = () => {
+  const handleSavePgn = async () => {
     // Provjera postoji li instanca i metoda kako bi se izbjegao crash
     if (
       typeof pgnText !== "string" &&
@@ -32,12 +33,69 @@ function PgnSaver({
     }
 
     // 2. Pretvaranje stringa u Blob s odgovarajućim MIME tipom
-    let downloadFileName = fileName;
+    const cleanedSuggestedName = String(fileName || "partija.pgn")
+      .split("")
+      .filter((character) => character.charCodeAt(0) >= 32)
+      .join("")
+      .replace(/[<>:"/\\|?*]/g, "-")
+      .replace(/[. ]+$/g, "")
+      .trim();
+    const safeSuggestedName = cleanedSuggestedName || "partija.pgn";
+    const suggestedFileName = safeSuggestedName.toLowerCase().endsWith(".pgn")
+      ? safeSuggestedName
+      : `${safeSuggestedName}.pgn`;
+    const shouldChooseDestination = showSaveDialog || askForFileName;
 
-    if (askForFileName) {
+    if (
+      shouldChooseDestination &&
+      typeof window.showSaveFilePicker === "function"
+    ) {
+      let fileHandle;
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          id: "chesscare-pgn-export",
+          startIn: "documents",
+          suggestedName: suggestedFileName,
+          types: [
+            {
+              description: "PGN sahovska datoteka",
+              accept: { "application/x-chess-pgn": [".pgn"] },
+            },
+          ],
+        });
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.warn(
+          "PgnSaver: sustavski dijalog nije dostupan, koristi se fallback.",
+          error,
+        );
+      }
+
+      if (fileHandle) {
+        try {
+          const writable = await fileHandle.createWritable();
+          await writable.write(
+            new Blob([pgnString], {
+              type: "application/x-chess-pgn;charset=utf-8",
+            }),
+          );
+          await writable.close();
+          onSave?.(fileHandle.name || suggestedFileName);
+          return;
+        } catch (error) {
+          console.error("PgnSaver: spremanje datoteke nije uspjelo.", error);
+          alert("Spremanje PGN datoteke nije uspjelo.");
+          return;
+        }
+      }
+    }
+
+    let downloadFileName = suggestedFileName;
+
+    if (shouldChooseDestination) {
       const enteredFileName = window.prompt(
         "Unesi ime PGN datoteke:",
-        fileName.replace(/\.pgn$/i, ""),
+        suggestedFileName.replace(/\.pgn$/i, ""),
       );
 
       if (enteredFileName === null) return;
@@ -78,6 +136,7 @@ function PgnSaver({
 
   return (
     <button
+      type="button"
       onClick={handleSavePgn}
       style={{
         padding: "10px 16px",

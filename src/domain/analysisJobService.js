@@ -174,9 +174,10 @@ export async function runPositionAnalysisJob(options) {
   );
   const resultsByKey = new Map();
   const missingTargets = [];
+  const forceRefresh = run.forceRefresh === true;
 
   for (const target of targets) {
-    const cached = cachedByKey.get(target.cacheKey);
+    const cached = forceRefresh ? null : cachedByKey.get(target.cacheKey);
     if (cached) {
       resultsByKey.set(target.cacheKey, cached);
     } else {
@@ -274,4 +275,3 @@ export async function runPositionAnalysisJob(options) {
     signal?.removeEventListener?.("abort", handleAbort);
   }
 }
-
