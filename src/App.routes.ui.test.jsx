@@ -26,7 +26,7 @@ describe("nove aplikacijske rute", () => {
   test.each(NEW_ROUTES)(
     "%s prikazuje ocekivani prazan prikaz bez pisanja u storage",
     async (path, heading) => {
-      window.history.pushState({}, "", path);
+      window.location.hash = path;
 
       render(<App />);
 
@@ -42,7 +42,7 @@ describe("nove aplikacijske rute", () => {
   );
 
   test("stara ruta statistike vodi na novi trajni prikaz analiza", async () => {
-    window.history.pushState({}, "", "/statistics");
+    window.location.hash = "/statistics";
 
     render(<App />);
 
@@ -53,12 +53,12 @@ describe("nove aplikacijske rute", () => {
         { timeout: 10_000 },
       ),
     ).toBeTruthy();
-    expect(window.location.pathname).toBe("/analysis-jobs");
+    expect(window.location.hash).toBe("#/analysis-jobs");
     expect(window.localStorage.length).toBe(0);
   });
 
   test("stara trening ruta bez partije vodi u personaliziranu sesiju", async () => {
-    window.history.pushState({}, "", "/training");
+    window.location.hash = "/training";
 
     render(<App />);
 
@@ -69,17 +69,18 @@ describe("nove aplikacijske rute", () => {
         { timeout: 10_000 },
       ),
     ).toBeTruthy();
-    expect(window.location.pathname).toBe("/training-session");
+    expect(window.location.hash).toBe("#/training-session");
   });
 
   test("stara trening poveznica s gameId cuva partiju u analizi pozicije", async () => {
-    window.history.pushState({}, "", "/training?gameId=game-bookmark");
+    window.location.hash = "/training?gameId=game-bookmark";
 
     render(<App />);
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe("/position-analysis");
-      expect(window.location.search).toBe("?gameId=game-bookmark");
+      expect(window.location.hash).toBe(
+        "#/position-analysis?gameId=game-bookmark",
+      );
     });
   });
 });
