@@ -1,7 +1,3 @@
 export default function Header() {
-  return (
-    <>
-      <h1>Welcome to Chesscare , your Chess parent</h1>
-    </>
-  );
+  return <h1>Chesscare – od odigrane partije do boljeg poteza</h1>;
 }

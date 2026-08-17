@@ -10,6 +10,7 @@ import {
 import "./App.css";
 
 const Pocetna = lazy(() => import("./components/Pocetna"));
+const Upute = lazy(() => import("./components/Upute"));
 const Import = lazy(() => import("./components/Import"));
 const Trening = lazy(() => import("./components/Trening"));
 const DomainDiagnostics = lazy(
@@ -66,6 +67,9 @@ function App() {
         <NavLink className={navLinkClass} end to="/">
           Glavna
         </NavLink>
+        <NavLink className={navLinkClass} to="/guide">
+          Upute
+        </NavLink>
         <NavLink className={navLinkClass} to="/import">
           Import
         </NavLink>
@@ -108,6 +112,7 @@ function App() {
       >
         <Routes>
           <Route path="/" element={<Pocetna />} />
+          <Route path="/guide" element={<Upute />} />
           <Route
             path="/statistics"
             element={<Navigate replace to="/analysis-jobs" />}

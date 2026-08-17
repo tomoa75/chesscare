@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
 
 const NEW_ROUTES = [
+  ["/guide", "Kako koristiti Chesscare"],
   ["/library", "Biblioteka partija"],
   ["/analysis-jobs", "Status analiza"],
   ["/players", "Profil igraca"],
