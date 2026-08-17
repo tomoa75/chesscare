@@ -1,8 +1,8 @@
 export default function Login() {
   return (
-    <>
-      <input placeholder="LOG IN"></input>
-      <input placeholder="SIGN UP"></input>
-    </>
+    <div className="home-login">
+      <input aria-label="Log in" placeholder="LOG IN" />
+      <input aria-label="Sign up" placeholder="SIGN UP" />
+    </div>
   );
 }

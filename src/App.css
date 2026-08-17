@@ -1,6 +1,46 @@
+html {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: #282c34;
+  color: white;
+  font-family: Verdana, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 nav a {
   color: white;
-  font-size: clamp(18px, 2.4vw, 38px);
+  font-size: clamp(14px, 1.25vw, 17px);
   font-family: "Verdana", sans-serif;
   font-weight: bold;
   text-decoration: none;
@@ -33,10 +73,51 @@ nav a {
 nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  justify-content: space-around;
-  padding: 8px 12px;
+  gap: 6px 10px;
+  justify-content: center;
+  padding: 8px max(12px, env(safe-area-inset-right)) 8px
+    max(12px, env(safe-area-inset-left));
   background-color: #656363;
+}
+
+.home-page {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  width: min(920px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: clamp(30px, 7vw, 80px) 0;
+  text-align: center;
+}
+
+.home-page h1 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(30px, 6vw, 64px);
+  line-height: 1.08;
+}
+
+.home-login {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: min(100%, 520px);
+}
+
+.home-login input {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+.home-illustration {
+  display: block;
+  width: min(100%, 640px);
+  height: auto;
 }
 
 .route-loading {
@@ -47,4 +128,41 @@ nav {
   color: #555950;
   background: #f3f1ea;
   font: 700 18px Verdana, sans-serif;
+}
+
+@media (max-width: 720px) {
+  nav {
+    position: sticky;
+    z-index: 100;
+    top: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-snap-type: inline proximity;
+  }
+
+  .nav-link {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 9px 11px;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  .home-page {
+    width: min(920px, calc(100% - 24px));
+    padding-top: 32px;
+  }
+
+  .home-login {
+    flex-direction: column;
+  }
+
+  .home-login input {
+    flex-basis: auto;
+    width: 100%;
+  }
 }

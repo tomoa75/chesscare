@@ -7,16 +7,24 @@ body {
 }
 
 .chess-container {
-  padding: 20px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(12px, 3vw, 24px);
   font-family: Verdana, sans-serif;
 }
 
+.chess-container h1 {
+  font-size: clamp(24px, 5vw, 40px);
+  line-height: 1.15;
+}
+
 .chess-board {
-  padding: 20px;
+  width: min(100%, 500px);
+  height: auto;
+  aspect-ratio: 1;
+  padding: clamp(4px, 2vw, 16px);
   border-radius: 10px;
-  overflow-x: auto;
-  width: 500px;
-  height: 500px;
+  overflow: hidden;
   font-size: 1.2em;
 }
 .chess-board-content {
@@ -29,6 +37,23 @@ body {
   gap: 10px;
   margin-top: 20px;
   flex-wrap: wrap;
+}
+
+.navigation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.navigation-controls .nav-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .chess-controls-navigation {
@@ -46,16 +71,18 @@ body {
 }
 
 .chess-input {
+  flex: 1 1 210px;
+  min-width: 0;
+  min-height: 44px;
+  width: auto;
   padding: 10px;
   font-size: 16px;
-  height: 40px;
-  width: 200px;
 }
 
 .chess-button {
   padding: 10px 20px;
   cursor: pointer;
-  height: 40px;
+  min-height: 44px;
   background: #0f0;
 }
 
@@ -70,11 +97,11 @@ body {
   color: #fff;
   border: none;
   cursor: pointer;
-  height: 40px;
+  min-height: 44px;
 }
 
 .chess-delete-move-button {
-  height: 40px;
+  min-height: 44px;
   padding: 10px 20px;
   border: 1px solid #fff;
   background: #8b1e1e;
@@ -161,4 +188,51 @@ body {
   max-width: 500px;
   margin-bottom: 12px;
   font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .chess-container {
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .chess-board {
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .navigation-controls {
+    justify-content: center;
+  }
+
+  .navigation-controls .nav-button:last-child {
+    flex-basis: 100%;
+  }
+
+  .chess-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .chess-controls > *,
+  .chess-controls > div,
+  .chess-controls > div > button,
+  .chess-input,
+  .chess-button,
+  .chess-reset-button,
+  .chess-delete-move-button {
+    width: 100%;
+  }
+
+  .saved-games-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chess-info h1,
+  .chess-info h2,
+  .chess-info p,
+  .chess-info code {
+    overflow-wrap: anywhere;
+  }
 }

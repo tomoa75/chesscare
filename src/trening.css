@@ -354,3 +354,38 @@ body {
     box-sizing: border-box;
   }
 }
+
+@media (max-width: 600px) {
+  .chessboard {
+    width: min(1280px, calc(100% - 24px));
+    margin: 12px auto;
+    gap: 12px;
+  }
+
+  .board-panel {
+    min-width: 0;
+  }
+
+  .board-toolbar,
+  .engine-heading,
+  .engine-line-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .moves-panel,
+  .engine-panel {
+    max-height: none;
+    padding: 12px;
+  }
+
+  .moves-table th,
+  .moves-table td {
+    padding: 8px 5px;
+  }
+
+  .engine-heading span {
+    max-width: none;
+    text-align: left;
+  }
+}
