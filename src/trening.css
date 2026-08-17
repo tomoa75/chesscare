@@ -363,7 +363,36 @@ body {
   }
 
   .board-panel {
+    order: 1;
     min-width: 0;
+    width: min(
+      100%,
+      clamp(220px, calc(100dvh - 300px), 480px)
+    );
+    margin: 0 auto;
+  }
+
+  .moves-panel {
+    order: 2;
+    max-height: min(42dvh, 380px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .engine-panel {
+    order: 3;
+  }
+
+  .moves-panel .move-navigation {
+    position: sticky;
+    z-index: 5;
+    top: 0;
+    box-shadow: 0 8px 14px rgba(2, 6, 23, 0.3);
+  }
+
+  .moves-panel .moves-table th {
+    position: static;
   }
 
   .board-toolbar,
@@ -375,8 +404,11 @@ body {
 
   .moves-panel,
   .engine-panel {
-    max-height: none;
     padding: 12px;
+  }
+
+  .engine-panel {
+    max-height: none;
   }
 
   .moves-table th,
